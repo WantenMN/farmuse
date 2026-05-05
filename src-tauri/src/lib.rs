@@ -62,6 +62,15 @@ fn list_subdirs(path: String) -> Result<Vec<String>, String> {
     Ok(result)
 }
 
+#[tauri::command]
+fn read_file_content(path: String) -> Result<String, String> {
+    let resolved_path = resolve_path(&path)?;
+    if !resolved_path.is_file() {
+        return Err("Not a file".to_string());
+    }
+    fs::read_to_string(resolved_path).map_err(|e| e.to_string())
+}
+
 fn resolve_path(path: &str) -> Result<PathBuf, String> {
     if path.starts_with("~/") {
         let home = std::env::var("HOME")
@@ -84,7 +93,7 @@ fn resolve_path(path: &str) -> Result<PathBuf, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![list_directory_contents, list_subdirs])
+        .invoke_handler(tauri::generate_handler![list_directory_contents, list_subdirs, read_file_content])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

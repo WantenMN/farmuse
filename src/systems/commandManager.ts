@@ -1,4 +1,4 @@
-type CommandHandler = () => void;
+type CommandHandler = (args?: any) => void;
 
 export interface Command {
   id: string;
@@ -20,10 +20,10 @@ class CommandManager {
     this.commands.delete(id);
   }
 
-  execute(id: string) {
+  execute(id: string, args?: any) {
     const command = this.commands.get(id);
     if (command) {
-      command.handler();
+      command.handler(args);
       // Update history: remove if exists, then push to front
       this.usageHistory = [id, ...this.usageHistory.filter(h => h !== id)];
       return true;

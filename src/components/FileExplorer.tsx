@@ -128,13 +128,17 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
 
     commandManager.register({
       id: "explorer.expand",
-      name: "Explorer: Expand Folder",
-      description: "Expand the currently focused folder",
+      name: "Explorer: Expand or Open",
+      description: "Expand the folder or open the file",
       handler: () => {
         if (!isActive || focusedIndex === -1) return;
         const entry = entries[focusedIndex];
-        if (entry.is_dir && !expandedPaths.has(entry.path)) {
-          toggleFolder(focusedIndex);
+        if (entry.is_dir) {
+          if (!expandedPaths.has(entry.path)) {
+            toggleFolder(focusedIndex);
+          }
+        } else {
+          commandManager.execute("open-file", { path: entry.path, name: entry.name });
         }
       },
       visible: true
@@ -179,12 +183,29 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
       visible: true
     });
 
+    commandManager.register({
+      id: "explorer.open",
+      name: "Explorer: Open Item",
+      description: "Open the focused file or toggle the focused folder",
+      handler: () => {
+        if (!isActive || focusedIndex === -1) return;
+        const entry = entries[focusedIndex];
+        if (entry.is_dir) {
+          toggleFolder(focusedIndex);
+        } else {
+          commandManager.execute("open-file", { path: entry.path, name: entry.name });
+        }
+      },
+      visible: true
+    });
+
     return () => {
       commandManager.unregister("explorer.focus");
       commandManager.unregister("explorer.moveDown");
       commandManager.unregister("explorer.moveUp");
       commandManager.unregister("explorer.expand");
       commandManager.unregister("explorer.collapse");
+      commandManager.unregister("explorer.open");
     };
   }, [entries, focusedIndex, isActive, expandedPaths, toggleFolder]);
 
@@ -237,7 +258,11 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
                       e.stopPropagation();
                       setFocusedIndex(index);
                       setIsActive(true);
-                      if (entry.is_dir) toggleFolder(index);
+                      if (entry.is_dir) {
+                        toggleFolder(index);
+                      } else {
+                        commandManager.execute("open-file", { path: entry.path, name: entry.name });
+                      }
                     }}
                   >
                     {/* Vertical line for expanded scope */}

@@ -51,6 +51,20 @@ export function CommandPalette() {
     }
   }, [filteredCommands, selectedId])
 
+  // Auto-scroll to selected item
+  React.useEffect(() => {
+    if (open && selectedId) {
+      const timer = setTimeout(() => {
+        // cmdk lowercases the value attribute
+        const selectedElement = document.querySelector(`[cmdk-item][data-value="${selectedId.toLowerCase()}"]`);
+        if (selectedElement) {
+          selectedElement.scrollIntoView({ block: 'nearest' });
+        }
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedId, open]);
+
   return (
     <CommandDialog
       open={open}
