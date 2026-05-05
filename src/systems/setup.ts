@@ -7,6 +7,15 @@ import { commandManager } from "./commandManager";
 export function setupSystems() {
   // Global Keybindings
   keyboardManager.bind("alt+x", "open-command-palette");
+  keyboardManager.bind("alt+1", "explorer.focus");
+  keyboardManager.bind("j", "explorer.moveDown");
+  keyboardManager.bind("k", "explorer.moveUp");
+  keyboardManager.bind("h", "explorer.collapse");
+  keyboardManager.bind("l", "explorer.expand");
+  keyboardManager.bind("arrowdown", "explorer.moveDown");
+  keyboardManager.bind("arrowup", "explorer.moveUp");
+  keyboardManager.bind("arrowleft", "explorer.collapse");
+  keyboardManager.bind("arrowright", "explorer.expand");
 
   // Example Global Commands
   commandManager.register({

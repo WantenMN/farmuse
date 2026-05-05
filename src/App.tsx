@@ -1,7 +1,9 @@
 import * as React from "react";
 import { CommandPalette } from "./components/CommandPalette";
 import { FolderPalette } from "./components/FolderPalette";
+import { FileExplorer } from "./components/FileExplorer";
 import { invoke } from "@tauri-apps/api/core";
+import { commandManager } from "./systems/commandManager";
 
 interface FileEntry {
   name: string;
@@ -12,55 +14,80 @@ interface FileEntry {
 function App() {
   const [currentPath, setCurrentPath] = React.useState<string | null>(null);
   const [entries, setEntries] = React.useState<FileEntry[]>([]);
+  const [showExplorer, setShowExplorer] = React.useState(true);
 
   const loadDirectory = React.useCallback(async (path: string) => {
     try {
       const result = await invoke<FileEntry[]>("list_directory_contents", { path });
       setEntries(result);
       setCurrentPath(path);
+      setShowExplorer(true);
     } catch (e) {
       console.error("Failed to load directory", e);
       alert("Failed to open directory: " + e);
     }
   }, []);
 
+  React.useEffect(() => {
+    commandManager.register({
+      id: "toggle-explorer",
+      name: "Toggle Explorer",
+      description: "Show or hide the file explorer sidebar",
+      handler: () => setShowExplorer(prev => !prev),
+    });
+
+    return () => {
+      commandManager.unregister("toggle-explorer");
+    };
+  }, []);
+
   return (
-    <main className="container mx-auto p-4">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold underline">Farmuse</h1>
-        <p className="mt-4 text-gray-600">
-          Press <kbd className="bg-gray-200 px-1 rounded shadow-sm border">Alt + X</kbd> to open command palette
-        </p>
-      </div>
+    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
+      <FileExplorer
+        currentPath={currentPath}
+        entries={entries}
+        isVisible={showExplorer}
+      />
 
-      {currentPath && (
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold mb-4 text-left">Contents of {currentPath}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {entries.map((entry) => (
-              <div
-                key={entry.path}
-                className="flex items-center p-3 border rounded shadow-sm hover:bg-gray-50 transition-colors"
-              >
-                <span className="mr-2">
-                  {entry.is_dir ? "📁" : "📄"}
-                </span>
-                <span className="truncate text-sm" title={entry.path}>
-                  {entry.name}
-                </span>
-              </div>
-            ))}
+      <main className="flex-1 flex flex-col min-w-0">
+        <div className="container mx-auto p-4 flex-1 flex flex-col items-center justify-center">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold tracking-tight mb-2">Farmuse</h1>
+            <p className="text-muted-foreground text-lg">
+              Manage your project with speed.
+            </p>
           </div>
-          {entries.length === 0 && (
-            <p className="text-gray-500 italic">This directory is empty.</p>
-          )}
-        </div>
-      )}
 
-      {/* The Command Palette is always available globally */}
+          <div className="max-w-md w-full space-y-4">
+            <div className="bg-muted/50 p-6 rounded-xl border border-border/50 text-center">
+              <p className="text-sm text-muted-foreground mb-4">
+                Global Shortcuts
+              </p>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Command Palette</span>
+                  <kbd className="bg-background px-2 py-1 rounded border shadow-sm text-xs font-sans font-medium">Alt + X</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Toggle Explorer</span>
+                  <kbd className="bg-background px-2 py-1 rounded border shadow-sm text-xs font-sans font-medium">Inside Palette</kbd>
+                </div>
+              </div>
+            </div>
+
+            {!currentPath && (
+              <p className="text-center text-sm text-muted-foreground animate-pulse">
+                Type "Open Folder" in palette to get started
+              </p>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {/* Global Overlays */}
       <CommandPalette />
       <FolderPalette onFolderSelect={loadDirectory} />
-    </main>
+    </div>
   );
 }
 

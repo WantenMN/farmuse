@@ -15,6 +15,20 @@ class KeyboardManager {
   }
 
   private handleKeyDown(event: KeyboardEvent) {
+    // Skip if user is typing in an input, textarea, or contentEditable element
+    const activeElement = document.activeElement;
+    const isTyping =
+      activeElement?.tagName === "INPUT" ||
+      activeElement?.tagName === "TEXTAREA" ||
+      (activeElement as HTMLElement)?.isContentEditable;
+
+    // However, we might want to allow some combos even when typing (like Alt+X)
+    const hasModifier = event.ctrlKey || event.altKey || event.metaKey;
+
+    if (isTyping && !hasModifier) {
+      return;
+    }
+
     const keys = [];
     if (event.ctrlKey) keys.push("ctrl");
     if (event.altKey) keys.push("alt");
