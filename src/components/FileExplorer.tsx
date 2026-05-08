@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { Folder, ChevronRight, ChevronDown } from "lucide-react";
 import { commandManager } from "../systems/commandManager";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { FileEntry as RawFileEntry } from "../types";
 
 interface FileEntry extends RawFileEntry {
@@ -25,16 +26,186 @@ export function FileExplorer({
     new Set()
   );
   const [focusedIndex, setFocusedIndex] = React.useState<number>(-1);
+  const [focusedPath, setFocusedPath] = React.useState<string | null>(null);
   const [prevFocusedIndex, setPrevFocusedIndex] = React.useState<number>(-1);
   const [isActive, setIsActive] = React.useState(false);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const lastRootPath = React.useRef<string | null>(null);
+  const hasRestored = React.useRef(false);
+  const expandedPathsRef = React.useRef(expandedPaths);
 
-  // Initialize entries from rootEntries
+  // Keep ref in sync
   React.useEffect(() => {
-    setEntries(rootEntries.map((e) => ({ ...e, depth: 0 })));
-    setExpandedPaths(new Set());
-    setFocusedIndex(rootEntries.length > 0 ? 0 : -1);
-  }, [rootEntries]);
+    expandedPathsRef.current = expandedPaths;
+  }, [expandedPaths]);
+
+  const refreshTree = React.useCallback(
+    async (currentExpanded: Set<string>) => {
+      if (!currentPath) return;
+
+      const fetchRecursive = async (
+        path: string,
+        depth: number
+      ): Promise<FileEntry[]> => {
+        try {
+          const children = await invoke<RawFileEntry[]>(
+            "list_directory_contents",
+            { path }
+          );
+          const result: FileEntry[] = [];
+          for (const child of children) {
+            const childEntry = { ...child, depth };
+            result.push(childEntry);
+            if (child.is_dir && currentExpanded.has(child.path)) {
+              const descendants = await fetchRecursive(child.path, depth + 1);
+              result.push(...descendants);
+            }
+          }
+          return result;
+        } catch (e) {
+          console.error("Failed to refresh folder", path, e);
+          return [];
+        }
+      };
+
+      try {
+        const rootEntriesFetched = await invoke<RawFileEntry[]>(
+          "list_directory_contents",
+          { path: currentPath }
+        );
+        const newEntries: FileEntry[] = [];
+        for (const rootEntry of rootEntriesFetched) {
+          newEntries.push({ ...rootEntry, depth: 0 });
+          if (rootEntry.is_dir && currentExpanded.has(rootEntry.path)) {
+            const descendants = await fetchRecursive(rootEntry.path, 1);
+            newEntries.push(...descendants);
+          }
+        }
+        setEntries(newEntries);
+      } catch (e) {
+        console.error("Failed to refresh tree", e);
+      }
+    },
+    [currentPath]
+  );
+
+  // Initialize entries from rootEntries and restore state
+  React.useEffect(() => {
+    if (!currentPath) {
+      setEntries([]);
+      setExpandedPaths(new Set());
+      setFocusedIndex(-1);
+      setFocusedPath(null);
+      hasRestored.current = false;
+      lastRootPath.current = null;
+      return;
+    }
+
+    if (currentPath !== lastRootPath.current) {
+      hasRestored.current = false;
+      lastRootPath.current = currentPath;
+    }
+
+    if (!hasRestored.current) {
+      const saved = localStorage.getItem(`explorer_state_${currentPath}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          const savedExpanded = new Set<string>(parsed.expandedPaths);
+          setExpandedPaths(savedExpanded);
+          setEntries(parsed.entries);
+          setFocusedPath(parsed.focusedPath);
+          hasRestored.current = true;
+
+          // Now refresh in background
+          refreshTree(savedExpanded);
+        } catch (e) {
+          console.error("Failed to restore explorer state", e);
+        }
+      }
+
+      if (!hasRestored.current) {
+        setEntries(rootEntries.map((e) => ({ ...e, depth: 0 })));
+        setExpandedPaths(new Set());
+        setFocusedIndex(rootEntries.length > 0 ? 0 : -1);
+        hasRestored.current = true;
+      }
+    } else {
+      // Already restored, but rootEntries might have changed from parent
+      // Only refresh if rootEntries actually has content (avoids clearing during load)
+      if (rootEntries.length > 0) {
+        refreshTree(expandedPathsRef.current);
+      }
+    }
+  }, [rootEntries, currentPath, refreshTree]);
+
+  // Sync focusedIndex and focusedPath
+  React.useEffect(() => {
+    if (focusedPath) {
+      const index = entries.findIndex((e) => e.path === focusedPath);
+      if (index !== -1) {
+        if (index !== focusedIndex) {
+          setFocusedIndex(index);
+        }
+      } else if (focusedIndex >= entries.length) {
+        setFocusedIndex(entries.length > 0 ? 0 : -1);
+      }
+    } else if (focusedIndex !== -1 && entries[focusedIndex]) {
+      setFocusedPath(entries[focusedIndex].path);
+    }
+  }, [entries, focusedPath, focusedIndex]);
+
+  // Persist state
+  React.useEffect(() => {
+    if (!currentPath || !hasRestored.current) return;
+
+    // Only keep expanded paths that are currently visible
+    const visibleExpanded = new Set<string>();
+    for (const entry of entries) {
+      if (entry.is_dir && expandedPaths.has(entry.path)) {
+        visibleExpanded.add(entry.path);
+      }
+    }
+
+    const state = {
+      expandedPaths: Array.from(visibleExpanded),
+      focusedPath: focusedIndex !== -1 ? entries[focusedIndex]?.path : null,
+      entries: entries,
+      currentPath: currentPath,
+    };
+    localStorage.setItem(
+      `explorer_state_${currentPath}`,
+      JSON.stringify(state)
+    );
+  }, [expandedPaths, focusedIndex, entries, currentPath]);
+
+  // Watch expanded directories
+  React.useEffect(() => {
+    if (!currentPath) return;
+
+    const pathsToWatch = [currentPath, ...Array.from(expandedPaths)];
+    invoke("watch_explorer_directories", { paths: pathsToWatch }).catch(
+      (err) => {
+        console.error("Failed to watch explorer directories:", err);
+      }
+    );
+  }, [expandedPaths, currentPath]);
+
+  // Listen for refresh events
+  React.useEffect(() => {
+    const unlistenPromise = listen<string>("explorer-refresh", (_event) => {
+      // When a directory changes, we refresh the whole tree
+      // to keep it simple and consistent.
+      // Since we only watch expanded folders, this is efficient enough.
+      if (currentPath) {
+        refreshTree(expandedPathsRef.current);
+      }
+    });
+
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [currentPath, refreshTree]);
 
   const toggleFolder = React.useCallback(
     async (index: number) => {
@@ -61,17 +232,34 @@ export function FileExplorer({
         setExpandedPaths(newExpandedPaths);
       } else {
         newExpandedPaths.add(entry.path);
-        try {
+
+        const fetchRecursive = async (
+          path: string,
+          depth: number
+        ): Promise<FileEntry[]> => {
           const children = await invoke<RawFileEntry[]>(
             "list_directory_contents",
-            { path: entry.path }
+            { path }
+          );
+          const result: FileEntry[] = [];
+          for (const child of children) {
+            const childEntry = { ...child, depth };
+            result.push(childEntry);
+            if (child.is_dir && newExpandedPaths.has(child.path)) {
+              const descendants = await fetchRecursive(child.path, depth + 1);
+              result.push(...descendants);
+            }
+          }
+          return result;
+        };
+
+        try {
+          const childrenWithDescendants = await fetchRecursive(
+            entry.path,
+            entry.depth + 1
           );
           const newEntries = [...entries];
-          const childrenWithDepth = children.map((c) => ({
-            ...c,
-            depth: entry.depth + 1,
-          }));
-          newEntries.splice(index + 1, 0, ...childrenWithDepth);
+          newEntries.splice(index + 1, 0, ...childrenWithDescendants);
           setEntries(newEntries);
           setExpandedPaths(newExpandedPaths);
         } catch (e) {
@@ -111,7 +299,9 @@ export function FileExplorer({
         setIsActive(true);
         scrollContainerRef.current?.focus();
         if (focusedIndex === -1 && entries.length > 0) {
-          setFocusedIndex(0);
+          const newIndex = 0;
+          setFocusedIndex(newIndex);
+          setFocusedPath(entries[newIndex].path);
         }
       },
     });
@@ -122,7 +312,11 @@ export function FileExplorer({
       description: "Focus the next item in the explorer",
       handler: () => {
         if (!isActive || entries.length === 0) return;
-        setFocusedIndex((prev) => (prev < entries.length - 1 ? prev + 1 : 0));
+        setFocusedIndex((prev) => {
+          const next = prev < entries.length - 1 ? prev + 1 : 0;
+          setFocusedPath(entries[next].path);
+          return next;
+        });
       },
       visible: true,
     });
@@ -133,7 +327,11 @@ export function FileExplorer({
       description: "Focus the previous item in the explorer",
       handler: () => {
         if (!isActive || entries.length === 0) return;
-        setFocusedIndex((prev) => (prev > 0 ? prev - 1 : entries.length - 1));
+        setFocusedIndex((prev) => {
+          const next = prev > 0 ? prev - 1 : entries.length - 1;
+          setFocusedPath(entries[next].path);
+          return next;
+        });
       },
       visible: true,
     });
@@ -172,6 +370,7 @@ export function FileExplorer({
         for (let i = focusedIndex - 1; i >= 0; i--) {
           if (entries[i].depth < currentEntry.depth) {
             setFocusedIndex(i);
+            setFocusedPath(entries[i].path);
             break;
           }
         }
@@ -286,6 +485,7 @@ export function FileExplorer({
                     onClick={(e) => {
                       e.stopPropagation();
                       setFocusedIndex(index);
+                      setFocusedPath(entry.path);
                       setIsActive(true);
                       if (entry.is_dir) {
                         toggleFolder(index);
