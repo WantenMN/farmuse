@@ -27,6 +27,95 @@ export function Editor({ path, name }: EditorProps) {
   );
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
+  // Use useLayoutEffect to adjust scroll before paint to avoid flickering
+  React.useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el || content === null) return;
+
+    const adjust = () => {
+      const { selectionStart, value, clientHeight, scrollTop } = el;
+
+      // Create a ghost element to measure exact cursor position
+      const ghost = document.createElement("div");
+      const style = window.getComputedStyle(el);
+
+      // Copy essential styles for measurement
+      const props = [
+        "direction",
+        "boxSizing",
+        "width",
+        "height",
+        "overflowX",
+        "overflowY",
+        "borderWidth",
+        "borderStyle",
+        "paddingTop",
+        "paddingRight",
+        "paddingBottom",
+        "paddingLeft",
+        "fontStyle",
+        "fontVariant",
+        "fontWeight",
+        "fontStretch",
+        "fontSize",
+        "fontSizeAdjust",
+        "lineHeight",
+        "fontFamily",
+        "textAlign",
+        "textTransform",
+        "textIndent",
+        "textDecoration",
+        "letterSpacing",
+        "wordSpacing",
+        "tabSize",
+        "whiteSpace",
+        "wordBreak",
+      ];
+
+      props.forEach((prop) => {
+        // @ts-expect-error - copying styles dynamically
+        ghost.style[prop] = style[prop];
+      });
+
+      ghost.style.position = "absolute";
+      ghost.style.visibility = "hidden";
+      ghost.style.whiteSpace = "pre-wrap";
+      ghost.style.wordWrap = "break-word";
+      ghost.style.height = "auto";
+      ghost.style.top = "0";
+      ghost.style.left = "-9999px";
+
+      // Set the text content up to the cursor
+      const text = value.substring(0, selectionStart);
+      ghost.textContent = text;
+
+      // Add a span to measure the cursor position
+      const span = document.createElement("span");
+      span.textContent = value.substring(selectionStart) || ".";
+      ghost.appendChild(span);
+
+      document.body.appendChild(ghost);
+      const cursorY = span.offsetTop;
+      document.body.removeChild(ghost);
+
+      const threshold = 120; // Approx 5 lines
+      const visibleBottom = scrollTop + clientHeight;
+
+      if (cursorY > visibleBottom - threshold) {
+        // Only scroll if we are actually adding content or moving down
+        el.scrollTop = cursorY - (clientHeight - threshold);
+      }
+    };
+
+    adjust();
+    const frame = requestAnimationFrame(adjust);
+    return () => cancelAnimationFrame(frame);
+  }, [content]);
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setContent(e.target.value);
+  };
+
   // Load file content
   React.useEffect(() => {
     if (!path || contentCache.has(path)) {
@@ -203,20 +292,18 @@ export function Editor({ path, name }: EditorProps) {
 
   return (
     <div className="bg-background flex min-h-0 flex-1 overflow-hidden">
-      <div className="flex h-full w-full flex-col">
-        <div className="relative flex-1">
-          <textarea
-            ref={textareaRef}
-            value={content || ""}
-            onChange={(e) => setContent(e.target.value)}
-            onScroll={saveScrollPosition}
-            className="selection:bg-primary/20 absolute inset-0 h-full w-full resize-none bg-transparent px-[max(2rem,calc((100%-48rem)/2+2rem))] py-10 font-mono text-sm leading-relaxed outline-none"
-            spellCheck={false}
-            autoFocus
-          />
-        </div>
-        <div className="bg-background flex items-center justify-end px-[max(2rem,calc((100%-48rem)/2+2rem))] py-1">
-          <div className="flex items-center gap-2">
+      <div className="relative h-full w-full">
+        <textarea
+          ref={textareaRef}
+          value={content || ""}
+          onChange={handleTextChange}
+          onScroll={saveScrollPosition}
+          className="selection:bg-primary/20 absolute inset-0 h-full w-full resize-none bg-transparent px-[max(2rem,calc((100%-48rem)/2+2rem))] pt-10 pb-[120px] font-mono text-sm leading-relaxed outline-none"
+          spellCheck={false}
+          autoFocus
+        />
+        <div className="pointer-events-none absolute right-[max(2rem,calc((100%-48rem)/2+2rem))] bottom-4 flex items-center gap-2">
+          <div className="bg-background/60 rounded-md px-2 py-0.5 backdrop-blur-md">
             {isSaving ? (
               <span className="text-muted-foreground flex animate-pulse items-center gap-1 text-[10px]">
                 <Save className="h-3 w-3" /> Saving...
