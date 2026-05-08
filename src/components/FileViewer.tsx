@@ -72,7 +72,7 @@ export function FileViewer({ path, name }: FileViewerProps) {
         <span className="text-sm font-medium truncate">{name}</span>
       </div>
       <div className="flex-1 overflow-auto p-4">
-        <pre className="font-mono text-sm whitespace-pre-wrap break-all">
+        <pre className="font-mono text-sm whitespace-pre-wrap break-all select-text">
           {content}
         </pre>
       </div>
