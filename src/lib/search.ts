@@ -15,7 +15,7 @@ export function fuzzyFilter<T>(
 
       // Standard subsequence fuzzy match
       let termIdx = 0;
-      for (let char of value) {
+      for (const char of value) {
         if (char === term[termIdx]) {
           termIdx++;
         }

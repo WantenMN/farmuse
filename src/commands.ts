@@ -43,7 +43,7 @@ export function registerGlobalCommands() {
       try {
         const { getCurrentWindow } = await import("@tauri-apps/api/window");
         await getCurrentWindow().close();
-      } catch (e) {
+      } catch {
         window.close();
       }
     }

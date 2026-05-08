@@ -88,7 +88,7 @@ function App() {
 
                 {!currentPath && (
                   <p className="text-center text-sm text-muted-foreground animate-pulse">
-                    Type "Open Folder" in palette to get started
+                    Type &quot;Open Folder&quot; in palette to get started
                   </p>
                 )}
               </div>

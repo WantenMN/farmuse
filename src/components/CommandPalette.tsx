@@ -34,7 +34,7 @@ export function CommandPalette() {
 
   const allCommands = React.useMemo(() => {
     return commandManager.getAllCommands().filter(cmd => cmd.visible !== false)
-  }, [open])
+  }, [])
 
   const filteredCommands = React.useMemo(() => {
     return fuzzyFilter(allCommands, search, (cmd) => cmd.name)

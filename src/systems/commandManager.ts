@@ -1,4 +1,4 @@
-type CommandHandler = (args?: any) => void;
+type CommandHandler = (args?: unknown) => void;
 
 export interface Command {
   id: string;
@@ -20,7 +20,7 @@ class CommandManager {
     this.commands.delete(id);
   }
 
-  execute(id: string, args?: any) {
+  execute(id: string, args?: unknown) {
     const command = this.commands.get(id);
     if (command) {
       command.handler(args);
