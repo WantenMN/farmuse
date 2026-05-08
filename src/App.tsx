@@ -14,35 +14,76 @@ import {
 import { FileEntry } from "./types";
 
 function App() {
-  const [currentPath, setCurrentPath] = React.useState<string | null>(null);
+  const [savedState] = React.useState(() => {
+    const saved = localStorage.getItem("farmuse_state");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved state", e);
+      }
+    }
+    return null;
+  });
+
+  const [currentPath, setCurrentPath] = React.useState<string | null>(
+    savedState?.currentPath || null
+  );
   const [entries, setEntries] = React.useState<FileEntry[]>([]);
-  const [showExplorer, setShowExplorer] = React.useState(true);
+  const [showExplorer, setShowExplorer] = React.useState(
+    savedState?.showExplorer !== undefined ? savedState.showExplorer : true
+  );
   const [activeFile, setActiveFile] = React.useState<{
     path: string;
     name: string;
-  } | null>(null);
+  } | null>(savedState?.activeFile || null);
 
-  const loadDirectory = React.useCallback(async (path: string) => {
-    try {
-      const result = await invoke<FileEntry[]>("list_directory_contents", {
-        path,
-      });
-      setEntries(result);
-      setCurrentPath(path);
-      setShowExplorer(true);
-      // Focus the explorer after a short delay to allow it to render entries
-      setTimeout(() => {
-        commandManager.execute("explorer.focus");
-      }, 50);
-    } catch (e) {
-      console.error("Failed to load directory", e);
-      alert("Failed to open directory: " + e);
+  const hasRestoredEntries = React.useRef(false);
+
+  const loadDirectory = React.useCallback(
+    async (path: string, shouldFocus = true) => {
+      try {
+        const result = await invoke<FileEntry[]>("list_directory_contents", {
+          path,
+        });
+        setEntries(result);
+        setCurrentPath(path);
+        if (shouldFocus) {
+          setShowExplorer(true);
+          // Focus the explorer after a short delay to allow it to render entries
+          setTimeout(() => {
+            commandManager.execute("explorer.focus");
+          }, 50);
+        }
+      } catch (e) {
+        console.error("Failed to load directory", e);
+        alert("Failed to open directory: " + e);
+      }
+    },
+    []
+  );
+
+  // Restore directory entries on mount if we have a path
+  React.useEffect(() => {
+    if (currentPath && !hasRestoredEntries.current) {
+      hasRestoredEntries.current = true;
+      loadDirectory(currentPath, false);
     }
-  }, []);
+  }, [currentPath, loadDirectory]);
+
+  // Save state on changes
+  React.useEffect(() => {
+    const state = {
+      currentPath,
+      activeFile,
+      showExplorer,
+    };
+    localStorage.setItem("farmuse_state", JSON.stringify(state));
+  }, [currentPath, activeFile, showExplorer]);
 
   React.useEffect(() => {
     registerAppCommands({
-      toggleExplorer: () => setShowExplorer((prev) => !prev),
+      toggleExplorer: () => setShowExplorer((prev: boolean) => !prev),
       closeFolder: () => {
         setCurrentPath(null);
         setEntries([]);
