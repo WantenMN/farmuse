@@ -8,20 +8,28 @@ interface EditorProps {
   name: string | null;
 }
 
+// Global caches to persist during the session (tab switching)
+const contentCache = new Map<string, string>();
+const lastSavedContentCache = new Map<string, string>();
+const scrollCache = new Map<string, { top: number; left: number }>();
+
 export function Editor({ path, name }: EditorProps) {
-  const [content, setContent] = React.useState<string | null>(null);
+  const [content, setContent] = React.useState<string | null>(() =>
+    path ? contentCache.get(path) || null : null
+  );
   const [error, setError] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(false);
+  const [loading, setLoading] = React.useState(() =>
+    path ? !contentCache.has(path) : false
+  );
   const [isSaving, setIsSaving] = React.useState(false);
   const [lastSavedContent, setLastSavedContent] = React.useState<string | null>(
-    null
+    () => (path ? lastSavedContentCache.get(path) || null : null)
   );
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   // Load file content
   React.useEffect(() => {
-    if (!path) {
-      setContent(null);
-      setError(null);
+    if (!path || contentCache.has(path)) {
       return;
     }
 
@@ -32,6 +40,9 @@ export function Editor({ path, name }: EditorProps) {
         const result = await invoke<string>("read_file_content", { path });
         setContent(result);
         setLastSavedContent(result);
+        // Initial cache population
+        contentCache.set(path, result);
+        lastSavedContentCache.set(path, result);
       } catch (e) {
         console.error("Failed to read file", e);
         setError(
@@ -44,6 +55,69 @@ export function Editor({ path, name }: EditorProps) {
     };
 
     loadFile();
+  }, [path]);
+
+  // Update caches when content changes
+  React.useEffect(() => {
+    if (path && content !== null) {
+      contentCache.set(path, content);
+    }
+  }, [content, path]);
+
+  React.useEffect(() => {
+    if (path && lastSavedContent !== null) {
+      lastSavedContentCache.set(path, lastSavedContent);
+    }
+  }, [lastSavedContent, path]);
+
+  // Scroll restoration and persistence
+  React.useEffect(() => {
+    if (path && content !== null && textareaRef.current) {
+      const el = textareaRef.current;
+      const restore = (top: number, left: number) => {
+        el.scrollTop = top;
+        el.scrollLeft = left;
+      };
+
+      // Try session cache first (instant)
+      const cached = scrollCache.get(path);
+      if (cached) {
+        restore(cached.top, cached.left);
+        return;
+      }
+
+      // Fallback to localStorage
+      const savedScroll = localStorage.getItem(`editor_scroll_${path}`);
+      if (savedScroll) {
+        try {
+          const { top, left } = JSON.parse(savedScroll);
+          restore(top, left);
+        } catch (e) {
+          console.error("Failed to restore scroll position", e);
+        }
+      }
+    }
+  }, [path, content]);
+
+  const saveScrollPosition = React.useCallback(() => {
+    if (path && textareaRef.current) {
+      const { scrollTop, scrollLeft } = textareaRef.current;
+      // Don't save if it's just 0/0 and we haven't checked if it was intentional
+      // (Simplified: always save to session cache, only persist to localStorage if needed)
+      scrollCache.set(path, { top: scrollTop, left: scrollLeft });
+    }
+  }, [path]);
+
+  // Persist scroll to localStorage occasionally or on unmount
+  React.useEffect(() => {
+    return () => {
+      if (path) {
+        const cached = scrollCache.get(path);
+        if (cached) {
+          localStorage.setItem(`editor_scroll_${path}`, JSON.stringify(cached));
+        }
+      }
+    };
   }, [path]);
 
   // Auto-save logic
@@ -132,8 +206,10 @@ export function Editor({ path, name }: EditorProps) {
       <div className="flex h-full w-full flex-col">
         <div className="relative flex-1">
           <textarea
+            ref={textareaRef}
             value={content || ""}
             onChange={(e) => setContent(e.target.value)}
+            onScroll={saveScrollPosition}
             className="selection:bg-primary/20 absolute inset-0 h-full w-full resize-none bg-transparent px-[max(2rem,calc((100%-48rem)/2+2rem))] py-10 font-mono text-sm leading-relaxed outline-none"
             spellCheck={false}
             autoFocus

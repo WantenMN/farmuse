@@ -156,7 +156,11 @@ function App() {
           )}
 
           {activeFile ? (
-            <Editor path={activeFile.path} name={activeFile.name} />
+            <Editor
+              key={activeFile.path}
+              path={activeFile.path}
+              name={activeFile.name}
+            />
           ) : (
             <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
               <div className="mb-8 text-center">
