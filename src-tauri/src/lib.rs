@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use serde::Serialize;
@@ -13,6 +14,7 @@ pub struct FileEntry {
 }
 
 pub struct WatcherState(Mutex<Option<notify::RecommendedWatcher>>);
+pub struct ExplorerWatcherState(Mutex<Option<notify::RecommendedWatcher>>);
 
 #[tauri::command]
 fn list_directory_contents(path: String) -> Result<Vec<FileEntry>, String> {
@@ -113,6 +115,49 @@ fn unwatch_file(state: tauri::State<WatcherState>) {
     *watcher_opt = None;
 }
 
+#[tauri::command]
+fn watch_explorer_directories(
+    app: AppHandle,
+    state: tauri::State<ExplorerWatcherState>,
+    paths: Vec<String>,
+) -> Result<(), String> {
+    let mut watcher_opt = state.0.lock().unwrap();
+    *watcher_opt = None;
+
+    if paths.is_empty() {
+        return Ok(());
+    }
+
+    let app_handle = app.clone();
+    let mut watcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
+        if let Ok(event) = res {
+            let mut dirs_to_refresh = HashSet::new();
+            for path in event.paths {
+                // If it's a directory that changed, or if a file inside a directory changed
+                if let Some(parent) = path.parent() {
+                    dirs_to_refresh.insert(parent.to_string_lossy().to_string());
+                }
+                // Also add the path itself if it's one of the watched directories
+                dirs_to_refresh.insert(path.to_string_lossy().to_string());
+            }
+            for dir in dirs_to_refresh {
+                let _ = app_handle.emit("explorer-refresh", dir);
+            }
+        }
+    })
+    .map_err(|e| e.to_string())?;
+
+    for path in paths {
+        let resolved = resolve_path(&path)?;
+        if resolved.is_dir() {
+            let _ = watcher.watch(&resolved, RecursiveMode::NonRecursive);
+        }
+    }
+
+    *watcher_opt = Some(watcher);
+    Ok(())
+}
+
 fn resolve_path(path: &str) -> Result<PathBuf, String> {
     if path.starts_with("~/") {
         let home = std::env::var("HOME")
@@ -135,6 +180,7 @@ fn resolve_path(path: &str) -> Result<PathBuf, String> {
 pub fn run() {
     tauri::Builder::default()
         .manage(WatcherState(Mutex::new(None)))
+        .manage(ExplorerWatcherState(Mutex::new(None)))
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             list_directory_contents,
@@ -142,7 +188,8 @@ pub fn run() {
             read_file_content,
             write_file_content,
             watch_file,
-            unwatch_file
+            unwatch_file,
+            watch_explorer_directories
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
