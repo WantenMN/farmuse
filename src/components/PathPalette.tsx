@@ -46,9 +46,13 @@ export function PathPalette({
       id: commandId,
       name: commandName,
       description: commandDescription,
-      handler: (args?: { path: string; name: string }) => {
-        if (args?.path) {
-          onSelect(args.path, args.name || args.path.split("/").pop() || "");
+      handler: (args?: unknown) => {
+        const fileArgs = args as { path: string; name?: string } | undefined;
+        if (fileArgs?.path) {
+          onSelect(
+            fileArgs.path,
+            fileArgs.name || fileArgs.path.split("/").pop() || ""
+          );
         } else {
           setOpen(true);
           setInputValue("~/");
