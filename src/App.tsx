@@ -1,4 +1,5 @@
 import * as React from "react";
+import { TitleBar } from "./components/TitleBar";
 import { CommandPalette } from "./components/CommandPalette";
 import { PathPalette } from "./components/PathPalette";
 import { FileExplorer } from "./components/FileExplorer";
@@ -52,51 +53,54 @@ function App() {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
-      <FileExplorer
-        currentPath={currentPath}
-        entries={entries}
-        isVisible={showExplorer}
-      />
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-background text-foreground">
+      <TitleBar />
+      <div className="flex flex-1 overflow-hidden">
+        <FileExplorer
+          currentPath={currentPath}
+          entries={entries}
+          isVisible={showExplorer}
+        />
 
-      <main className="flex-1 flex flex-col min-w-0">
-        {activeFile ? (
-          <FileViewer path={activeFile.path} name={activeFile.name} />
-        ) : (
-          <div className="container mx-auto p-4 flex-1 flex flex-col items-center justify-center">
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold tracking-tight mb-2">Farmuse</h1>
-              <p className="text-muted-foreground text-lg">
-                Manage your project with speed.
-              </p>
-            </div>
-
-            <div className="max-w-md w-full space-y-4">
-              <div className="bg-muted/50 p-6 rounded-xl border border-border/50 text-center">
-                <p className="text-sm text-muted-foreground mb-4">
-                  Global Shortcuts
+        <main className="flex-1 flex flex-col min-w-0">
+          {activeFile ? (
+            <FileViewer path={activeFile.path} name={activeFile.name} />
+          ) : (
+            <div className="container mx-auto p-4 flex-1 flex flex-col items-center justify-center">
+              <div className="text-center mb-8">
+                <h1 className="text-4xl font-bold tracking-tight mb-2">Farmuse</h1>
+                <p className="text-muted-foreground text-lg">
+                  Manage your project with speed.
                 </p>
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Command Palette</span>
-                    <kbd className="bg-background px-2 py-1 rounded border shadow-sm text-xs font-sans font-medium">Alt + X</kbd>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Toggle Explorer</span>
-                    <kbd className="bg-background px-2 py-1 rounded border shadow-sm text-xs font-sans font-medium">Inside Palette</kbd>
-                  </div>
-                </div>
               </div>
 
-              {!currentPath && (
-                <p className="text-center text-sm text-muted-foreground animate-pulse">
-                  Type "Open Folder" in palette to get started
-                </p>
-              )}
+              <div className="max-w-md w-full space-y-4">
+                <div className="bg-muted/50 p-6 rounded-xl border border-border/50 text-center">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Global Shortcuts
+                  </p>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Command Palette</span>
+                      <kbd className="bg-background px-2 py-1 rounded border shadow-sm text-xs font-sans font-medium">Alt + X</kbd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Toggle Explorer</span>
+                      <kbd className="bg-background px-2 py-1 rounded border shadow-sm text-xs font-sans font-medium">Inside Palette</kbd>
+                    </div>
+                  </div>
+                </div>
+
+                {!currentPath && (
+                  <p className="text-center text-sm text-muted-foreground animate-pulse">
+                    Type "Open Folder" in palette to get started
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </main>
+          )}
+        </main>
+      </div>
 
       {/* Global Overlays */}
       <CommandPalette />
