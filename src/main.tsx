@@ -7,6 +7,9 @@ import { setupSystems } from "./systems/setup";
 // Initialize systems before rendering
 setupSystems();
 
+// Disable default context menu globally
+document.addEventListener("contextmenu", (e) => e.preventDefault(), false);
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <App />
