@@ -128,36 +128,40 @@ export function Editor({ path, name }: EditorProps) {
   }
 
   return (
-    <div className="bg-background flex min-h-0 flex-1 flex-col">
-      <div className="bg-muted/30 flex items-center justify-between border-b px-4 py-2">
-        <div className="flex items-center gap-2 overflow-hidden">
-          <FileText className="text-primary h-4 w-4 shrink-0" />
-          <span className="truncate text-sm font-medium select-none">
-            {name}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 px-2">
-          {isSaving ? (
-            <span className="text-muted-foreground flex animate-pulse items-center gap-1 text-[10px]">
-              <Save className="h-3 w-3" /> Saving...
+    <div className="bg-background flex min-h-0 flex-1 justify-center overflow-hidden">
+      <div className="flex h-full w-full max-w-3xl flex-col">
+        <div className="bg-muted/30 flex items-center justify-between border-b px-4 py-2">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <FileText className="text-primary h-4 w-4 shrink-0" />
+            <span className="truncate text-sm font-medium select-none">
+              {name}
             </span>
-          ) : content !== lastSavedContent ? (
-            <span className="text-muted-foreground flex items-center gap-1 text-[10px]">
-              Modified
-            </span>
-          ) : (
-            <span className="text-muted-foreground/50 text-[10px]">Saved</span>
-          )}
+          </div>
+          <div className="flex items-center gap-2 px-2">
+            {isSaving ? (
+              <span className="text-muted-foreground flex animate-pulse items-center gap-1 text-[10px]">
+                <Save className="h-3 w-3" /> Saving...
+              </span>
+            ) : content !== lastSavedContent ? (
+              <span className="text-muted-foreground flex items-center gap-1 text-[10px]">
+                Modified
+              </span>
+            ) : (
+              <span className="text-muted-foreground/50 text-[10px]">
+                Saved
+              </span>
+            )}
+          </div>
         </div>
-      </div>
-      <div className="relative flex-1">
-        <textarea
-          value={content || ""}
-          onChange={(e) => setContent(e.target.value)}
-          className="selection:bg-primary/20 absolute inset-0 h-full w-full resize-none bg-transparent p-4 font-mono text-sm outline-none"
-          spellCheck={false}
-          autoFocus
-        />
+        <div className="relative flex-1">
+          <textarea
+            value={content || ""}
+            onChange={(e) => setContent(e.target.value)}
+            className="selection:bg-primary/20 absolute inset-0 h-full w-full resize-none bg-transparent px-8 py-10 font-mono text-sm leading-relaxed outline-none"
+            spellCheck={false}
+            autoFocus
+          />
+        </div>
       </div>
     </div>
   );
