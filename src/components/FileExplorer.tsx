@@ -3,17 +3,15 @@ import { cn } from "@/lib/utils"
 import { Folder, ChevronRight, ChevronDown } from "lucide-react"
 import { commandManager } from "../systems/commandManager"
 import { invoke } from "@tauri-apps/api/core"
+import { FileEntry as RawFileEntry } from "../types"
 
-interface FileEntry {
-  name: string;
-  path: string;
-  is_dir: boolean;
+interface FileEntry extends RawFileEntry {
   depth: number;
 }
 
 interface FileExplorerProps {
   currentPath: string | null;
-  entries: FileEntry[];
+  entries: RawFileEntry[];
   isVisible: boolean;
 }
 
@@ -57,7 +55,7 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
     } else {
       newExpandedPaths.add(entry.path);
       try {
-        const children = await invoke<FileEntry[]>("list_directory_contents", { path: entry.path });
+        const children = await invoke<RawFileEntry[]>("list_directory_contents", { path: entry.path });
         const newEntries = [...entries];
         const childrenWithDepth = children.map(c => ({ ...c, depth: entry.depth + 1 }));
         newEntries.splice(index + 1, 0, ...childrenWithDepth);

@@ -7,12 +7,7 @@ import { FileViewer } from "./components/FileViewer";
 import { invoke } from "@tauri-apps/api/core";
 import { commandManager } from "./systems/commandManager";
 import { registerAppCommands, unregisterAppCommands, COMMAND_METADATA } from "./commands";
-
-interface FileEntry {
-  name: string;
-  path: string;
-  is_dir: boolean;
-}
+import { FileEntry } from "./types";
 
 function App() {
   const [currentPath, setCurrentPath] = React.useState<string | null>(null);
