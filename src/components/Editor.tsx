@@ -130,14 +130,17 @@ export function Editor({ path, name }: EditorProps) {
   return (
     <div className="bg-background flex min-h-0 flex-1 justify-center overflow-hidden">
       <div className="flex h-full w-full max-w-3xl flex-col">
-        <div className="bg-muted/30 flex items-center justify-between border-b px-4 py-2">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <FileText className="text-primary h-4 w-4 shrink-0" />
-            <span className="truncate text-sm font-medium select-none">
-              {name}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 px-2">
+        <div className="relative flex-1">
+          <textarea
+            value={content || ""}
+            onChange={(e) => setContent(e.target.value)}
+            className="selection:bg-primary/20 absolute inset-0 h-full w-full resize-none bg-transparent px-8 py-10 font-mono text-sm leading-relaxed outline-none"
+            spellCheck={false}
+            autoFocus
+          />
+        </div>
+        <div className="bg-background flex items-center justify-end px-4 py-1">
+          <div className="flex items-center gap-2">
             {isSaving ? (
               <span className="text-muted-foreground flex animate-pulse items-center gap-1 text-[10px]">
                 <Save className="h-3 w-3" /> Saving...
@@ -152,15 +155,6 @@ export function Editor({ path, name }: EditorProps) {
               </span>
             )}
           </div>
-        </div>
-        <div className="relative flex-1">
-          <textarea
-            value={content || ""}
-            onChange={(e) => setContent(e.target.value)}
-            className="selection:bg-primary/20 absolute inset-0 h-full w-full resize-none bg-transparent px-8 py-10 font-mono text-sm leading-relaxed outline-none"
-            spellCheck={false}
-            autoFocus
-          />
         </div>
       </div>
     </div>

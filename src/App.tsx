@@ -4,6 +4,7 @@ import { CommandPalette } from "./components/CommandPalette";
 import { PathPalette } from "./components/PathPalette";
 import { FileExplorer } from "./components/FileExplorer";
 import { Editor } from "./components/Editor";
+import { Tabs } from "./components/Tabs";
 import { invoke } from "@tauri-apps/api/core";
 import { commandManager } from "./systems/commandManager";
 import {
@@ -33,10 +34,20 @@ function App() {
   const [showExplorer, setShowExplorer] = React.useState(
     savedState?.showExplorer !== undefined ? savedState.showExplorer : true
   );
-  const [activeFile, setActiveFile] = React.useState<{
-    path: string;
-    name: string;
-  } | null>(savedState?.activeFile || null);
+  const [openFiles, setOpenFiles] = React.useState<
+    {
+      path: string;
+      name: string;
+    }[]
+  >(savedState?.openFiles || []);
+  const [activeFilePath, setActiveFilePath] = React.useState<string | null>(
+    savedState?.activeFilePath || null
+  );
+
+  const activeFile = React.useMemo(
+    () => openFiles.find((f) => f.path === activeFilePath) || null,
+    [openFiles, activeFilePath]
+  );
 
   const hasRestoredEntries = React.useRef(false);
 
@@ -75,11 +86,33 @@ function App() {
   React.useEffect(() => {
     const state = {
       currentPath,
-      activeFile,
+      openFiles,
+      activeFilePath,
       showExplorer,
     };
     localStorage.setItem("farmuse_state", JSON.stringify(state));
-  }, [currentPath, activeFile, showExplorer]);
+  }, [currentPath, openFiles, activeFilePath, showExplorer]);
+
+  const openFile = React.useCallback((path: string, name: string) => {
+    setOpenFiles((prev) => {
+      if (prev.some((f) => f.path === path)) return prev;
+      return [...prev, { path, name }];
+    });
+    setActiveFilePath(path);
+  }, []);
+
+  const closeFile = React.useCallback(
+    (path: string) => {
+      setOpenFiles((prev) => {
+        const newFiles = prev.filter((f) => f.path !== path);
+        if (activeFilePath === path) {
+          setActiveFilePath(newFiles.length > 0 ? newFiles[0].path : null);
+        }
+        return newFiles;
+      });
+    },
+    [activeFilePath]
+  );
 
   React.useEffect(() => {
     registerAppCommands({
@@ -87,15 +120,20 @@ function App() {
       closeFolder: () => {
         setCurrentPath(null);
         setEntries([]);
-        setActiveFile(null);
+        setOpenFiles([]);
+        setActiveFilePath(null);
       },
-      closeFile: () => setActiveFile(null),
+      closeFile: () => {
+        if (activeFilePath) {
+          closeFile(activeFilePath);
+        }
+      },
     });
 
     return () => {
       unregisterAppCommands();
     };
-  }, []);
+  }, [activeFilePath, closeFile]);
 
   return (
     <div className="bg-background text-foreground flex h-screen w-screen flex-col overflow-hidden">
@@ -108,6 +146,15 @@ function App() {
         />
 
         <main className="flex min-w-0 flex-1 flex-col">
+          {openFiles.length > 0 && (
+            <Tabs
+              files={openFiles}
+              activePath={activeFilePath}
+              onSelect={setActiveFilePath}
+              onClose={closeFile}
+            />
+          )}
+
           {activeFile ? (
             <Editor path={activeFile.path} name={activeFile.name} />
           ) : (
@@ -169,7 +216,7 @@ function App() {
         commandDescription={COMMAND_METADATA.OPEN_FILE.description}
         mode="file"
         placeholder="Search for a file..."
-        onSelect={(path, name) => setActiveFile({ path, name })}
+        onSelect={openFile}
       />
     </div>
   );
