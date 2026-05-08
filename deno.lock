@@ -14,6 +14,8 @@
     "npm:clsx@^2.1.1": "2.1.1",
     "npm:cmdk@^1.1.1": "1.1.1_react@18.3.1_react-dom@18.3.1__react@18.3.1_@types+react@18.3.28_@types+react-dom@18.3.7__@types+react@18.3.28",
     "npm:lucide-react@^1.14.0": "1.14.0_react@18.3.1",
+    "npm:prettier-plugin-tailwindcss@0.8": "0.8.0_prettier@3.8.3",
+    "npm:prettier@^3.8.3": "3.8.3",
     "npm:react-dom@^18.3.1": "18.3.1_react@18.3.1",
     "npm:react@^18.3.1": "18.3.1",
     "npm:tailwind-merge@^3.5.0": "3.5.0",
@@ -1176,6 +1178,16 @@
         "source-map-js"
       ]
     },
+    "prettier-plugin-tailwindcss@0.8.0_prettier@3.8.3": {
+      "integrity": "sha512-V8ITGH87yuBDF6JpEZTOVlUz/saAwqb8f3HRgUj8Lh+tGCcrmorhsLpYqzygwFwK0PE2Ib6Mv3M7T/uE2tZV1g==",
+      "dependencies": [
+        "prettier"
+      ]
+    },
+    "prettier@3.8.3": {
+      "integrity": "sha512-7igPTM53cGHMW8xWuVTydi2KO233VFiTNyF5hLJqpilHfmn8C8gPf+PS7dUT64YcXFbiMGZxS9pCSxL/Dxm/Jw==",
+      "bin": true
+    },
     "react-dom@18.3.1_react@18.3.1": {
       "integrity": "sha512-5m4nQKp+rZRb09LNH59GM4BxTh9251/ylbKIbpe7TpGxfJ+9kv6BLkLBXIjjspbgbnIBNqlI23tRnTWT0snUIw==",
       "dependencies": [
@@ -1370,6 +1382,8 @@
         "npm:clsx@^2.1.1",
         "npm:cmdk@^1.1.1",
         "npm:lucide-react@^1.14.0",
+        "npm:prettier-plugin-tailwindcss@0.8",
+        "npm:prettier@^3.8.3",
         "npm:react-dom@^18.3.1",
         "npm:react@^18.3.1",
         "npm:tailwind-merge@^3.5.0",
