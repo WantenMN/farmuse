@@ -8,7 +8,7 @@ export function registerGlobalCommands() {
     id: "reload-app",
     name: "Reload Application",
     description: "Force refresh the current page",
-    handler: () => window.location.reload()
+    handler: () => window.location.reload(),
   });
 
   commandManager.register({
@@ -18,21 +18,24 @@ export function registerGlobalCommands() {
     handler: () => {
       document.documentElement.classList.toggle("dark");
       console.log("Theme toggled");
-    }
+    },
   });
 
   commandManager.register({
     id: "go-home",
     name: "Go to Home",
     description: "Navigate to the home dashboard",
-    handler: () => console.log("Navigating home...")
+    handler: () => console.log("Navigating home..."),
   });
 
   commandManager.register({
     id: "show-help",
     name: "Show Help",
     description: "View documentation and keyboard shortcuts",
-    handler: () => alert("Help: Alt+X opens the command palette. Use Arrows or Tab to navigate.")
+    handler: () =>
+      alert(
+        "Help: Alt+X opens the command palette. Use Arrows or Tab to navigate."
+      ),
   });
 
   commandManager.register({
@@ -46,7 +49,7 @@ export function registerGlobalCommands() {
       } catch {
         window.close();
       }
-    }
+    },
   });
 }
 

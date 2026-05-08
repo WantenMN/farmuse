@@ -1,7 +1,7 @@
-import * as React from "react"
-import { invoke } from "@tauri-apps/api/core"
-import { listen } from "@tauri-apps/api/event"
-import { FileText, AlertCircle, Save } from "lucide-react"
+import * as React from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { FileText, AlertCircle, Save } from "lucide-react";
 
 interface EditorProps {
   path: string | null;
@@ -13,7 +13,9 @@ export function Editor({ path, name }: EditorProps) {
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
-  const [lastSavedContent, setLastSavedContent] = React.useState<string | null>(null);
+  const [lastSavedContent, setLastSavedContent] = React.useState<string | null>(
+    null
+  );
 
   // Load file content
   React.useEffect(() => {
@@ -32,7 +34,9 @@ export function Editor({ path, name }: EditorProps) {
         setLastSavedContent(result);
       } catch (e) {
         console.error("Failed to read file", e);
-        setError("Unable to open: This file might be binary or use an unsupported encoding.");
+        setError(
+          "Unable to open: This file might be binary or use an unsupported encoding."
+        );
         setContent(null);
       } finally {
         setLoading(false);
@@ -44,7 +48,8 @@ export function Editor({ path, name }: EditorProps) {
 
   // Auto-save logic
   React.useEffect(() => {
-    if (path === null || content === null || content === lastSavedContent) return;
+    if (path === null || content === null || content === lastSavedContent)
+      return;
 
     const timer = setTimeout(async () => {
       setIsSaving(true);
@@ -69,34 +74,36 @@ export function Editor({ path, name }: EditorProps) {
     invoke("watch_file", { path }).catch(console.error);
 
     const unlistenPromise = listen<string>("file-changed", async (event) => {
-        if (event.payload === path) {
-            try {
-                const newContent = await invoke<string>("read_file_content", { path });
-                // Only update if content is actually different to avoid unnecessary re-renders
-                // and avoid overwriting if we just saved it (though read_file_content should match lastSavedContent then)
-                setContent(prev => {
-                    if (newContent !== prev) {
-                        setLastSavedContent(newContent);
-                        return newContent;
-                    }
-                    return prev;
-                });
-            } catch (e) {
-                console.error("Failed to reload file on change", e);
+      if (event.payload === path) {
+        try {
+          const newContent = await invoke<string>("read_file_content", {
+            path,
+          });
+          // Only update if content is actually different to avoid unnecessary re-renders
+          // and avoid overwriting if we just saved it (though read_file_content should match lastSavedContent then)
+          setContent((prev) => {
+            if (newContent !== prev) {
+              setLastSavedContent(newContent);
+              return newContent;
             }
+            return prev;
+          });
+        } catch (e) {
+          console.error("Failed to reload file on change", e);
         }
+      }
     });
 
     return () => {
-      unlistenPromise.then(unlisten => unlisten());
+      unlistenPromise.then((unlisten) => unlisten());
       invoke("unwatch_file").catch(console.error);
     };
   }, [path]);
 
   if (!path) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground select-none">
-        <FileText className="h-12 w-12 mb-4 opacity-20" />
+      <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center select-none">
+        <FileText className="mb-4 h-12 w-12 opacity-20" />
         <p className="text-sm">Select a file to start editing</p>
       </div>
     );
@@ -104,50 +111,50 @@ export function Editor({ path, name }: EditorProps) {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center select-none">
-        <p className="text-sm animate-pulse">Loading {name}...</p>
+      <div className="flex flex-1 items-center justify-center select-none">
+        <p className="animate-pulse text-sm">Loading {name}...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-destructive p-4 text-center select-none">
-        <AlertCircle className="h-12 w-12 mb-4 opacity-50" />
-        <h3 className="font-semibold mb-1">Cannot Open File</h3>
-        <p className="text-sm max-w-xs">{error}</p>
+      <div className="text-destructive flex flex-1 flex-col items-center justify-center p-4 text-center select-none">
+        <AlertCircle className="mb-4 h-12 w-12 opacity-50" />
+        <h3 className="mb-1 font-semibold">Cannot Open File</h3>
+        <p className="max-w-xs text-sm">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-background">
-      <div className="px-4 py-2 border-b bg-muted/30 flex items-center justify-between">
+    <div className="bg-background flex min-h-0 flex-1 flex-col">
+      <div className="bg-muted/30 flex items-center justify-between border-b px-4 py-2">
         <div className="flex items-center gap-2 overflow-hidden">
-          <FileText className="h-4 w-4 text-primary shrink-0" />
-          <span className="text-sm font-medium truncate select-none">{name}</span>
+          <FileText className="text-primary h-4 w-4 shrink-0" />
+          <span className="truncate text-sm font-medium select-none">
+            {name}
+          </span>
         </div>
         <div className="flex items-center gap-2 px-2">
-            {isSaving ? (
-                <span className="text-[10px] text-muted-foreground animate-pulse flex items-center gap-1">
-                    <Save className="h-3 w-3" /> Saving...
-                </span>
-            ) : content !== lastSavedContent ? (
-                <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                    Modified
-                </span>
-            ) : (
-                <span className="text-[10px] text-muted-foreground/50">
-                    Saved
-                </span>
-            )}
+          {isSaving ? (
+            <span className="text-muted-foreground flex animate-pulse items-center gap-1 text-[10px]">
+              <Save className="h-3 w-3" /> Saving...
+            </span>
+          ) : content !== lastSavedContent ? (
+            <span className="text-muted-foreground flex items-center gap-1 text-[10px]">
+              Modified
+            </span>
+          ) : (
+            <span className="text-muted-foreground/50 text-[10px]">Saved</span>
+          )}
         </div>
       </div>
-      <div className="flex-1 relative">
+      <div className="relative flex-1">
         <textarea
           value={content || ""}
           onChange={(e) => setContent(e.target.value)}
-          className="absolute inset-0 w-full h-full p-4 font-mono text-sm bg-transparent outline-none resize-none selection:bg-primary/20"
+          className="selection:bg-primary/20 absolute inset-0 h-full w-full resize-none bg-transparent p-4 font-mono text-sm outline-none"
           spellCheck={false}
           autoFocus
         />

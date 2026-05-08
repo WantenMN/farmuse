@@ -1,9 +1,9 @@
-import * as React from "react"
-import { cn } from "@/lib/utils"
-import { Folder, ChevronRight, ChevronDown } from "lucide-react"
-import { commandManager } from "../systems/commandManager"
-import { invoke } from "@tauri-apps/api/core"
-import { FileEntry as RawFileEntry } from "../types"
+import * as React from "react";
+import { cn } from "@/lib/utils";
+import { Folder, ChevronRight, ChevronDown } from "lucide-react";
+import { commandManager } from "../systems/commandManager";
+import { invoke } from "@tauri-apps/api/core";
+import { FileEntry as RawFileEntry } from "../types";
 
 interface FileEntry extends RawFileEntry {
   depth: number;
@@ -15,9 +15,15 @@ interface FileExplorerProps {
   isVisible: boolean;
 }
 
-export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: FileExplorerProps) {
+export function FileExplorer({
+  currentPath,
+  entries: rootEntries,
+  isVisible,
+}: FileExplorerProps) {
   const [entries, setEntries] = React.useState<FileEntry[]>([]);
-  const [expandedPaths, setExpandedPaths] = React.useState<Set<string>>(new Set());
+  const [expandedPaths, setExpandedPaths] = React.useState<Set<string>>(
+    new Set()
+  );
   const [focusedIndex, setFocusedIndex] = React.useState<number>(-1);
   const [prevFocusedIndex, setPrevFocusedIndex] = React.useState<number>(-1);
   const [isActive, setIsActive] = React.useState(false);
@@ -25,47 +31,56 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
 
   // Initialize entries from rootEntries
   React.useEffect(() => {
-    setEntries(rootEntries.map(e => ({ ...e, depth: 0 })));
+    setEntries(rootEntries.map((e) => ({ ...e, depth: 0 })));
     setExpandedPaths(new Set());
     setFocusedIndex(rootEntries.length > 0 ? 0 : -1);
   }, [rootEntries]);
 
-  const toggleFolder = React.useCallback(async (index: number) => {
-    const entry = entries[index];
-    if (!entry || !entry.is_dir) return;
+  const toggleFolder = React.useCallback(
+    async (index: number) => {
+      const entry = entries[index];
+      if (!entry || !entry.is_dir) return;
 
-    const isExpanded = expandedPaths.has(entry.path);
-    const newExpandedPaths = new Set(expandedPaths);
+      const isExpanded = expandedPaths.has(entry.path);
+      const newExpandedPaths = new Set(expandedPaths);
 
-    if (isExpanded) {
-      newExpandedPaths.delete(entry.path);
-      // Remove all descendants
-      const newEntries = [...entries];
-      let removeCount = 0;
-      for (let i = index + 1; i < newEntries.length; i++) {
-        if (newEntries[i].depth > entry.depth) {
-          removeCount++;
-        } else {
-          break;
-        }
-      }
-      newEntries.splice(index + 1, removeCount);
-      setEntries(newEntries);
-      setExpandedPaths(newExpandedPaths);
-    } else {
-      newExpandedPaths.add(entry.path);
-      try {
-        const children = await invoke<RawFileEntry[]>("list_directory_contents", { path: entry.path });
+      if (isExpanded) {
+        newExpandedPaths.delete(entry.path);
+        // Remove all descendants
         const newEntries = [...entries];
-        const childrenWithDepth = children.map(c => ({ ...c, depth: entry.depth + 1 }));
-        newEntries.splice(index + 1, 0, ...childrenWithDepth);
+        let removeCount = 0;
+        for (let i = index + 1; i < newEntries.length; i++) {
+          if (newEntries[i].depth > entry.depth) {
+            removeCount++;
+          } else {
+            break;
+          }
+        }
+        newEntries.splice(index + 1, removeCount);
         setEntries(newEntries);
         setExpandedPaths(newExpandedPaths);
-      } catch (e) {
-        console.error("Failed to expand folder", e);
+      } else {
+        newExpandedPaths.add(entry.path);
+        try {
+          const children = await invoke<RawFileEntry[]>(
+            "list_directory_contents",
+            { path: entry.path }
+          );
+          const newEntries = [...entries];
+          const childrenWithDepth = children.map((c) => ({
+            ...c,
+            depth: entry.depth + 1,
+          }));
+          newEntries.splice(index + 1, 0, ...childrenWithDepth);
+          setEntries(newEntries);
+          setExpandedPaths(newExpandedPaths);
+        } catch (e) {
+          console.error("Failed to expand folder", e);
+        }
       }
-    }
-  }, [entries, expandedPaths]);
+    },
+    [entries, expandedPaths]
+  );
 
   // Scroll focused item into view
   React.useEffect(() => {
@@ -73,7 +88,8 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
       const list = scrollContainerRef.current.children[0];
       if (!list || !list.children[focusedIndex]) return;
 
-      const isMovingDown = prevFocusedIndex === -1 || focusedIndex > prevFocusedIndex;
+      const isMovingDown =
+        prevFocusedIndex === -1 || focusedIndex > prevFocusedIndex;
       const targetIndex = isMovingDown
         ? Math.min(focusedIndex + 2, entries.length - 1)
         : Math.max(focusedIndex - 2, 0);
@@ -106,11 +122,9 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
       description: "Focus the next item in the explorer",
       handler: () => {
         if (!isActive || entries.length === 0) return;
-        setFocusedIndex((prev) =>
-          prev < entries.length - 1 ? prev + 1 : 0
-        );
+        setFocusedIndex((prev) => (prev < entries.length - 1 ? prev + 1 : 0));
       },
-      visible: true
+      visible: true,
     });
 
     commandManager.register({
@@ -121,7 +135,7 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
         if (!isActive || entries.length === 0) return;
         setFocusedIndex((prev) => (prev > 0 ? prev - 1 : entries.length - 1));
       },
-      visible: true
+      visible: true,
     });
 
     commandManager.register({
@@ -136,10 +150,13 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
             toggleFolder(focusedIndex);
           }
         } else {
-          commandManager.execute("open-file", { path: entry.path, name: entry.name });
+          commandManager.execute("open-file", {
+            path: entry.path,
+            name: entry.name,
+          });
         }
       },
-      visible: true
+      visible: true,
     });
 
     commandManager.register({
@@ -159,7 +176,7 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
           }
         }
       },
-      visible: true
+      visible: true,
     });
 
     commandManager.register({
@@ -178,7 +195,7 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
           commandManager.execute("explorer.focusParent");
         }
       },
-      visible: true
+      visible: true,
     });
 
     commandManager.register({
@@ -191,10 +208,13 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
         if (entry.is_dir) {
           toggleFolder(focusedIndex);
         } else {
-          commandManager.execute("open-file", { path: entry.path, name: entry.name });
+          commandManager.execute("open-file", {
+            path: entry.path,
+            name: entry.name,
+          });
         }
       },
-      visible: true
+      visible: true,
     });
 
     return () => {
@@ -212,17 +232,22 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
   return (
     <aside
       className={cn(
-        "w-64 border-r bg-muted/30 flex flex-col h-full overflow-hidden shrink-0 focus-within:ring-1 focus-within:ring-inset focus-within:ring-primary/20 focus-within:bg-muted/50",
+        "bg-muted/30 focus-within:ring-primary/20 focus-within:bg-muted/50 flex h-full w-64 shrink-0 flex-col overflow-hidden border-r focus-within:ring-1 focus-within:ring-inset",
         isActive && "bg-muted/50"
       )}
     >
-      <div className="p-3 border-b bg-background/50 flex items-center gap-2 overflow-hidden min-h-[48px]">
-        <Folder className="h-4 w-4 shrink-0 text-primary/70" />
-        <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground truncate" title={currentPath || "No Folder"}>
-          {currentPath ? (currentPath.split('/').filter(Boolean).pop() || 'Root') : 'No folder'}
+      <div className="bg-background/50 flex min-h-[48px] items-center gap-2 overflow-hidden border-b p-3">
+        <Folder className="text-primary/70 h-4 w-4 shrink-0" />
+        <h2
+          className="text-muted-foreground truncate text-xs font-bold tracking-wider uppercase"
+          title={currentPath || "No Folder"}
+        >
+          {currentPath
+            ? currentPath.split("/").filter(Boolean).pop() || "Root"
+            : "No folder"}
         </h2>
       </div>
-      <div className="flex-1 flex flex-col min-h-0 py-1">
+      <div className="flex min-h-0 flex-1 flex-col py-1">
         <div
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto px-1 outline-none"
@@ -231,11 +256,13 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
           onBlur={() => setIsActive(false)}
         >
           {!currentPath ? (
-            <div className="h-full flex flex-col items-center justify-center p-4 text-center">
-              <p className="text-xs text-muted-foreground italic tracking-tight">Open a folder to start</p>
+            <div className="flex h-full flex-col items-center justify-center p-4 text-center">
+              <p className="text-muted-foreground text-xs tracking-tight italic">
+                Open a folder to start
+              </p>
             </div>
           ) : entries.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic p-2">Empty</p>
+            <p className="text-muted-foreground p-2 text-xs italic">Empty</p>
           ) : (
             <div className="space-y-px">
               {entries.map((entry, index) => {
@@ -246,12 +273,16 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
                   <div
                     key={entry.path}
                     className={cn(
-                      "flex items-center gap-1 px-1.5 py-0.5 rounded-sm cursor-pointer text-sm relative group transition-none",
-                      isFocused && isActive && "bg-accent text-accent-foreground ring-1 ring-primary/30 z-10",
-                      isFocused && !isActive && "bg-accent/50 text-accent-foreground/80 ring-1 ring-muted-foreground/20 z-10",
+                      "group relative flex cursor-pointer items-center gap-1 rounded-sm px-1.5 py-0.5 text-sm transition-none",
+                      isFocused &&
+                        isActive &&
+                        "bg-accent text-accent-foreground ring-primary/30 z-10 ring-1",
+                      isFocused &&
+                        !isActive &&
+                        "bg-accent/50 text-accent-foreground/80 ring-muted-foreground/20 z-10 ring-1",
                       !isFocused && "hover:bg-accent/30"
                     )}
-                    style={{ paddingLeft: `${(entry.depth * 12) + 6}px` }}
+                    style={{ paddingLeft: `${entry.depth * 12 + 6}px` }}
                     onClick={(e) => {
                       e.stopPropagation();
                       setFocusedIndex(index);
@@ -259,29 +290,36 @@ export function FileExplorer({ currentPath, entries: rootEntries, isVisible }: F
                       if (entry.is_dir) {
                         toggleFolder(index);
                       } else {
-                        commandManager.execute("open-file", { path: entry.path, name: entry.name });
+                        commandManager.execute("open-file", {
+                          path: entry.path,
+                          name: entry.name,
+                        });
                       }
                     }}
                   >
                     {/* Vertical line for expanded scope */}
-                    {entry.depth > 0 && Array.from({ length: entry.depth }).map((_, i) => (
+                    {entry.depth > 0 &&
+                      Array.from({ length: entry.depth }).map((_, i) => (
                         <div
-                            key={i}
-                            className="absolute border-l border-muted-foreground/20 h-full"
-                            style={{ left: `${(i * 12) + 12}px` }}
+                          key={i}
+                          className="border-muted-foreground/20 absolute h-full border-l"
+                          style={{ left: `${i * 12 + 12}px` }}
                         />
-                    ))}
+                      ))}
 
-                    <div className="w-4 flex items-center justify-center shrink-0 z-10">
+                    <div className="z-10 flex w-4 shrink-0 items-center justify-center">
                       {entry.is_dir ? (
                         isExpanded ? (
-                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                          <ChevronDown className="text-muted-foreground h-3.5 w-3.5" />
                         ) : (
-                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                          <ChevronRight className="text-muted-foreground h-3.5 w-3.5" />
                         )
                       ) : null}
                     </div>
-                    <span className="truncate tracking-tight z-10" title={entry.name}>
+                    <span
+                      className="z-10 truncate tracking-tight"
+                      title={entry.name}
+                    >
                       {entry.name}
                     </span>
                   </div>

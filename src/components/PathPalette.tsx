@@ -1,4 +1,4 @@
-import * as React from "react"
+import * as React from "react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -6,11 +6,11 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command"
-import { commandManager } from "../systems/commandManager"
-import { invoke } from "@tauri-apps/api/core"
-import { Folder, FileText } from "lucide-react"
-import { fuzzyFilter } from "@/lib/search"
+} from "@/components/ui/command";
+import { commandManager } from "../systems/commandManager";
+import { invoke } from "@tauri-apps/api/core";
+import { Folder, FileText } from "lucide-react";
+import { fuzzyFilter } from "@/lib/search";
 
 interface FileEntry {
   name: string;
@@ -22,7 +22,7 @@ interface PathPaletteProps {
   commandId: string;
   commandName: string;
   commandDescription: string;
-  mode: 'file' | 'folder';
+  mode: "file" | "folder";
   onSelect: (path: string, name: string) => void;
   placeholder?: string;
 }
@@ -33,25 +33,25 @@ export function PathPalette({
   commandDescription,
   mode,
   onSelect,
-  placeholder = "Search path..."
+  placeholder = "Search path...",
 }: PathPaletteProps) {
-  const [open, setOpen] = React.useState(false)
-  const [inputValue, setInputValue] = React.useState("~/")
-  const [suggestions, setSuggestions] = React.useState<FileEntry[]>([])
-  const [selectedValue, setSelectedValue] = React.useState<string>("")
-  const inputRef = React.useRef<HTMLInputElement>(null)
+  const [open, setOpen] = React.useState(false);
+  const [inputValue, setInputValue] = React.useState("~/");
+  const [suggestions, setSuggestions] = React.useState<FileEntry[]>([]);
+  const [selectedValue, setSelectedValue] = React.useState<string>("");
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     commandManager.register({
       id: commandId,
       name: commandName,
       description: commandDescription,
-      handler: (args?: { path: string, name: string }) => {
+      handler: (args?: { path: string; name: string }) => {
         if (args?.path) {
-          onSelect(args.path, args.name || args.path.split('/').pop() || "");
+          onSelect(args.path, args.name || args.path.split("/").pop() || "");
         } else {
-          setOpen(true)
-          setInputValue("~/")
+          setOpen(true);
+          setInputValue("~/");
           setTimeout(() => {
             if (inputRef.current) {
               const len = inputRef.current.value.length;
@@ -60,29 +60,35 @@ export function PathPalette({
           }, 0);
         }
       },
-    })
+    });
 
     return () => {
-      commandManager.unregister(commandId)
-    }
-  }, [commandId, commandName, commandDescription, onSelect])
+      commandManager.unregister(commandId);
+    };
+  }, [commandId, commandName, commandDescription, onSelect]);
 
-  const fetchSuggestions = React.useCallback(async (path: string) => {
-    try {
-      let dirToList = path;
-      if (!path.endsWith("/") && path.includes("/")) {
-        dirToList = path.substring(0, path.lastIndexOf("/") + 1);
+  const fetchSuggestions = React.useCallback(
+    async (path: string) => {
+      try {
+        let dirToList = path;
+        if (!path.endsWith("/") && path.includes("/")) {
+          dirToList = path.substring(0, path.lastIndexOf("/") + 1);
+        }
+
+        const items = await invoke<FileEntry[]>("list_directory_contents", {
+          path: dirToList,
+        });
+        // If folder mode, only show directories
+        const filteredItems =
+          mode === "folder" ? items.filter((i) => i.is_dir) : items;
+        setSuggestions(filteredItems);
+      } catch (e) {
+        console.error("Failed to fetch suggestions", e);
+        setSuggestions([]);
       }
-
-      const items = await invoke<FileEntry[]>("list_directory_contents", { path: dirToList });
-      // If folder mode, only show directories
-      const filteredItems = mode === 'folder' ? items.filter(i => i.is_dir) : items;
-      setSuggestions(filteredItems);
-    } catch (e) {
-      console.error("Failed to fetch suggestions", e);
-      setSuggestions([]);
-    }
-  }, [mode]);
+    },
+    [mode]
+  );
 
   React.useEffect(() => {
     if (open) {
@@ -104,25 +110,30 @@ export function PathPalette({
         newPath += "/";
       }
       setInputValue(newPath);
-    } else if (mode === 'file') {
+    } else if (mode === "file") {
       onSelect(item.path, item.name);
       setOpen(false);
     }
   };
 
   const handleConfirm = () => {
-    if (mode === 'folder' && inputValue) {
-      onSelect(inputValue, inputValue.split('/').filter(Boolean).pop() || "Root");
+    if (mode === "folder" && inputValue) {
+      onSelect(
+        inputValue,
+        inputValue.split("/").filter(Boolean).pop() || "Root"
+      );
       setOpen(false);
     } else {
-      const selected = filteredSuggestions.find(s => s.name === selectedValue);
+      const selected = filteredSuggestions.find(
+        (s) => s.name === selectedValue
+      );
       if (selected) {
         handleSelection(selected);
       }
     }
   };
 
-  const lastPart = inputValue.split('/').pop() || "";
+  const lastPart = inputValue.split("/").pop() || "";
   const filteredSuggestions = React.useMemo(() => {
     return fuzzyFilter(suggestions, lastPart, (s) => s.name).slice(0, 20);
   }, [suggestions, lastPart]);
@@ -132,9 +143,11 @@ export function PathPalette({
     if (open && selectedValue) {
       // Small delay to ensure cmdk has updated the DOM attributes
       const timer = setTimeout(() => {
-        const selectedElement = document.querySelector(`[cmdk-item][data-value="${selectedValue}"]`);
+        const selectedElement = document.querySelector(
+          `[cmdk-item][data-value="${selectedValue}"]`
+        );
         if (selectedElement) {
-          selectedElement.scrollIntoView({ block: 'nearest' });
+          selectedElement.scrollIntoView({ block: "nearest" });
         }
       }, 0);
       return () => clearTimeout(timer);
@@ -143,7 +156,9 @@ export function PathPalette({
 
   React.useEffect(() => {
     if (filteredSuggestions.length > 0) {
-      const currentSelected = filteredSuggestions.find(c => c.name === selectedValue);
+      const currentSelected = filteredSuggestions.find(
+        (c) => c.name === selectedValue
+      );
       if (!currentSelected) {
         setSelectedValue(filteredSuggestions[0].name);
       }
@@ -159,25 +174,27 @@ export function PathPalette({
       commandProps={{
         shouldFilter: false,
         value: selectedValue,
-        onValueChange: setSelectedValue
+        onValueChange: setSelectedValue,
       }}
     >
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
-        <CommandGroup heading={mode === 'file' ? "Files & Directories" : "Directories"}>
+        <CommandGroup
+          heading={mode === "file" ? "Files & Directories" : "Directories"}
+        >
           {filteredSuggestions.map((item) => (
             <CommandItem
               key={item.path}
               value={item.name}
               onSelect={() => handleSelection(item)}
-              className="py-3 cursor-pointer"
+              className="cursor-pointer py-3"
             >
               {item.is_dir ? (
                 <Folder className="mr-2 h-4 w-4 opacity-50" />
               ) : (
                 <FileText className="mr-2 h-4 w-4 opacity-50" />
               )}
-              <div className="font-medium text-sm">{item.name}</div>
+              <div className="text-sm font-medium">{item.name}</div>
             </CommandItem>
           ))}
         </CommandGroup>
@@ -191,23 +208,33 @@ export function PathPalette({
           if (e.key === "ArrowDown") {
             e.preventDefault();
             if (filteredSuggestions.length > 0) {
-              const currentIndex = filteredSuggestions.findIndex(s => s.name === selectedValue);
+              const currentIndex = filteredSuggestions.findIndex(
+                (s) => s.name === selectedValue
+              );
               const nextIndex = (currentIndex + 1) % filteredSuggestions.length;
               setSelectedValue(filteredSuggestions[nextIndex].name);
             }
           } else if (e.key === "ArrowUp") {
             e.preventDefault();
             if (filteredSuggestions.length > 0) {
-              const currentIndex = filteredSuggestions.findIndex(s => s.name === selectedValue);
-              const nextIndex = (currentIndex - 1 + filteredSuggestions.length) % filteredSuggestions.length;
+              const currentIndex = filteredSuggestions.findIndex(
+                (s) => s.name === selectedValue
+              );
+              const nextIndex =
+                (currentIndex - 1 + filteredSuggestions.length) %
+                filteredSuggestions.length;
               setSelectedValue(filteredSuggestions[nextIndex].name);
             }
           } else if (e.key === "Tab") {
             e.preventDefault();
-            const selected = filteredSuggestions.find(s => s.name === selectedValue);
+            const selected = filteredSuggestions.find(
+              (s) => s.name === selectedValue
+            );
             if (selected) handleSelection(selected);
           } else if (e.key === "Enter") {
-            const selected = filteredSuggestions.find(s => s.name === selectedValue);
+            const selected = filteredSuggestions.find(
+              (s) => s.name === selectedValue
+            );
             if (selected && lastPart !== "" && lastPart !== selected.name) {
               handleSelection(selected);
             } else {
@@ -217,5 +244,5 @@ export function PathPalette({
         }}
       />
     </CommandDialog>
-  )
+  );
 }

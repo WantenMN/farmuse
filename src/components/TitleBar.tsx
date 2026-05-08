@@ -29,36 +29,38 @@ export function TitleBar() {
   return (
     <div
       data-tauri-drag-region
-      className="flex items-center justify-between h-8 bg-background border-b border-border select-none"
+      className="bg-background border-border flex h-8 items-center justify-between border-b select-none"
     >
-      <div className="flex items-center px-3 gap-2 pointer-events-none">
-        <span className="text-xs font-medium text-muted-foreground">Farmuse</span>
+      <div className="pointer-events-none flex items-center gap-2 px-3">
+        <span className="text-muted-foreground text-xs font-medium">
+          Farmuse
+        </span>
       </div>
       <div className="flex h-full">
         <button
           onClick={handleMinimize}
-          className="flex items-center justify-center w-10 h-full hover:bg-muted transition-colors"
+          className="hover:bg-muted flex h-full w-10 items-center justify-center transition-colors"
           title="Minimize"
         >
-          <Minus className="w-3.5 h-3.5" />
+          <Minus className="h-3.5 w-3.5" />
         </button>
         <button
           onClick={handleMaximize}
-          className="flex items-center justify-center w-10 h-full hover:bg-muted transition-colors"
+          className="hover:bg-muted flex h-full w-10 items-center justify-center transition-colors"
           title={isMaximized ? "Restore" : "Maximize"}
         >
           {isMaximized ? (
-            <Copy className="w-3.5 h-3.5" />
+            <Copy className="h-3.5 w-3.5" />
           ) : (
-            <Square className="w-3.5 h-3.5" />
+            <Square className="h-3.5 w-3.5" />
           )}
         </button>
         <button
           onClick={handleClose}
-          className="flex items-center justify-center w-10 h-full hover:bg-destructive hover:text-destructive-foreground transition-colors"
+          className="hover:bg-destructive hover:text-destructive-foreground flex h-full w-10 items-center justify-center transition-colors"
           title="Close"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="h-3.5 w-3.5" />
         </button>
       </div>
     </div>

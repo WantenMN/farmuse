@@ -25,7 +25,7 @@ class CommandManager {
     if (command) {
       command.handler(args);
       // Update history: remove if exists, then push to front
-      this.usageHistory = [id, ...this.usageHistory.filter(h => h !== id)];
+      this.usageHistory = [id, ...this.usageHistory.filter((h) => h !== id)];
       return true;
     }
     return false;

@@ -6,18 +6,27 @@ import { FileExplorer } from "./components/FileExplorer";
 import { Editor } from "./components/Editor";
 import { invoke } from "@tauri-apps/api/core";
 import { commandManager } from "./systems/commandManager";
-import { registerAppCommands, unregisterAppCommands, COMMAND_METADATA } from "./commands";
+import {
+  registerAppCommands,
+  unregisterAppCommands,
+  COMMAND_METADATA,
+} from "./commands";
 import { FileEntry } from "./types";
 
 function App() {
   const [currentPath, setCurrentPath] = React.useState<string | null>(null);
   const [entries, setEntries] = React.useState<FileEntry[]>([]);
   const [showExplorer, setShowExplorer] = React.useState(true);
-  const [activeFile, setActiveFile] = React.useState<{ path: string; name: string } | null>(null);
+  const [activeFile, setActiveFile] = React.useState<{
+    path: string;
+    name: string;
+  } | null>(null);
 
   const loadDirectory = React.useCallback(async (path: string) => {
     try {
-      const result = await invoke<FileEntry[]>("list_directory_contents", { path });
+      const result = await invoke<FileEntry[]>("list_directory_contents", {
+        path,
+      });
       setEntries(result);
       setCurrentPath(path);
       setShowExplorer(true);
@@ -33,7 +42,7 @@ function App() {
 
   React.useEffect(() => {
     registerAppCommands({
-      toggleExplorer: () => setShowExplorer(prev => !prev),
+      toggleExplorer: () => setShowExplorer((prev) => !prev),
       closeFolder: () => {
         setCurrentPath(null);
         setEntries([]);
@@ -48,7 +57,7 @@ function App() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-background text-foreground">
+    <div className="bg-background text-foreground flex h-screen w-screen flex-col overflow-hidden">
       <TitleBar />
       <div className="flex flex-1 overflow-hidden">
         <FileExplorer
@@ -57,37 +66,43 @@ function App() {
           isVisible={showExplorer}
         />
 
-        <main className="flex-1 flex flex-col min-w-0">
+        <main className="flex min-w-0 flex-1 flex-col">
           {activeFile ? (
             <Editor path={activeFile.path} name={activeFile.name} />
           ) : (
-            <div className="container mx-auto p-4 flex-1 flex flex-col items-center justify-center">
-              <div className="text-center mb-8">
-                <h1 className="text-4xl font-bold tracking-tight mb-2">Farmuse</h1>
+            <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
+              <div className="mb-8 text-center">
+                <h1 className="mb-2 text-4xl font-bold tracking-tight">
+                  Farmuse
+                </h1>
                 <p className="text-muted-foreground text-lg">
                   Manage your project with speed.
                 </p>
               </div>
 
-              <div className="max-w-md w-full space-y-4">
-                <div className="bg-muted/50 p-6 rounded-xl border border-border/50 text-center">
-                  <p className="text-sm text-muted-foreground mb-4">
+              <div className="w-full max-w-md space-y-4">
+                <div className="bg-muted/50 border-border/50 rounded-xl border p-6 text-center">
+                  <p className="text-muted-foreground mb-4 text-sm">
                     Global Shortcuts
                   </p>
                   <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Command Palette</span>
-                      <kbd className="bg-background px-2 py-1 rounded border shadow-sm text-xs font-sans font-medium">Alt + X</kbd>
+                      <kbd className="bg-background rounded border px-2 py-1 font-sans text-xs font-medium shadow-sm">
+                        Alt + X
+                      </kbd>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Toggle Explorer</span>
-                      <kbd className="bg-background px-2 py-1 rounded border shadow-sm text-xs font-sans font-medium">Inside Palette</kbd>
+                      <kbd className="bg-background rounded border px-2 py-1 font-sans text-xs font-medium shadow-sm">
+                        Inside Palette
+                      </kbd>
                     </div>
                   </div>
                 </div>
 
                 {!currentPath && (
-                  <p className="text-center text-sm text-muted-foreground animate-pulse">
+                  <p className="text-muted-foreground animate-pulse text-center text-sm">
                     Type &quot;Open Folder&quot; in palette to get started
                   </p>
                 )}
