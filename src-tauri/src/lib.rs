@@ -1,6 +1,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use serde::Serialize;
+use notify::{Watcher, RecursiveMode, Event};
+use std::sync::Mutex;
+use tauri::{AppHandle, Emitter};
 
 #[derive(Serialize)]
 pub struct FileEntry {
@@ -8,6 +11,8 @@ pub struct FileEntry {
     path: String,
     is_dir: bool,
 }
+
+pub struct WatcherState(Mutex<Option<notify::RecommendedWatcher>>);
 
 #[tauri::command]
 fn list_directory_contents(path: String) -> Result<Vec<FileEntry>, String> {
@@ -71,6 +76,43 @@ fn read_file_content(path: String) -> Result<String, String> {
     fs::read_to_string(resolved_path).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn write_file_content(path: String, content: String) -> Result<(), String> {
+    let resolved_path = resolve_path(&path)?;
+    fs::write(resolved_path, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn watch_file(app: AppHandle, state: tauri::State<WatcherState>, path: String) -> Result<(), String> {
+    let resolved_path = resolve_path(&path)?;
+    let mut watcher_opt = state.0.lock().unwrap();
+
+    // Stop previous watcher
+    *watcher_opt = None;
+
+    let app_clone = app.clone();
+    let path_clone = path.clone();
+
+    let mut watcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
+        if let Ok(event) = res {
+            if event.kind.is_modify() {
+                let _ = app_clone.emit("file-changed", path_clone.clone());
+            }
+        }
+    }).map_err(|e| e.to_string())?;
+
+    watcher.watch(&resolved_path, RecursiveMode::NonRecursive).map_err(|e| e.to_string())?;
+
+    *watcher_opt = Some(watcher);
+    Ok(())
+}
+
+#[tauri::command]
+fn unwatch_file(state: tauri::State<WatcherState>) {
+    let mut watcher_opt = state.0.lock().unwrap();
+    *watcher_opt = None;
+}
+
 fn resolve_path(path: &str) -> Result<PathBuf, String> {
     if path.starts_with("~/") {
         let home = std::env::var("HOME")
@@ -92,8 +134,17 @@ fn resolve_path(path: &str) -> Result<PathBuf, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(WatcherState(Mutex::new(None)))
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![list_directory_contents, list_subdirs, read_file_content])
+        .invoke_handler(tauri::generate_handler![
+            list_directory_contents,
+            list_subdirs,
+            read_file_content,
+            write_file_content,
+            watch_file,
+            unwatch_file
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+

@@ -3,7 +3,7 @@ import { TitleBar } from "./components/TitleBar";
 import { CommandPalette } from "./components/CommandPalette";
 import { PathPalette } from "./components/PathPalette";
 import { FileExplorer } from "./components/FileExplorer";
-import { FileViewer } from "./components/FileViewer";
+import { Editor } from "./components/Editor";
 import { invoke } from "@tauri-apps/api/core";
 import { commandManager } from "./systems/commandManager";
 import { registerAppCommands, unregisterAppCommands, COMMAND_METADATA } from "./commands";
@@ -59,7 +59,7 @@ function App() {
 
         <main className="flex-1 flex flex-col min-w-0">
           {activeFile ? (
-            <FileViewer path={activeFile.path} name={activeFile.name} />
+            <Editor path={activeFile.path} name={activeFile.name} />
           ) : (
             <div className="container mx-auto p-4 flex-1 flex flex-col items-center justify-center">
               <div className="text-center mb-8">
