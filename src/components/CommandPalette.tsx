@@ -36,7 +36,8 @@ export function CommandPalette() {
     return commandManager
       .getAllCommands()
       .filter((cmd) => cmd.visible !== false);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const filteredCommands = React.useMemo(() => {
     return fuzzyFilter(allCommands, search, (cmd) => cmd.name);
