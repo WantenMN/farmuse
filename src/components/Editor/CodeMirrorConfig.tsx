@@ -357,107 +357,109 @@ const livePreviewPlugin = ViewPlugin.fromClass(
   }
 );
 
-export const editorTheme = EditorView.theme({
-  "&": { height: "100%", width: "100%", backgroundColor: "transparent" },
-  ".cm-scroller": {
-    display: "grid !important",
-    gridTemplateColumns: "1fr minmax(0, 48rem) 1fr",
-    width: "100%",
-    overflow: "auto",
-    fontFamily:
-      "var(--font-sans, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif)",
-    scrollbarGutter: "stable",
-    paddingTop: "2.5rem",
-    paddingBottom: "50vh",
-  },
-  ".cm-gutters": {
-    gridColumn: "1",
-    justifySelf: "end",
-    display: "flex",
-    backgroundColor: "transparent",
-    borderRight: "none",
-    color: "var(--muted-foreground)",
-    opacity: "0.8",
-  },
-  ".cm-content": {
-    gridColumn: "2",
-    width: "100%",
-    maxWidth: "48rem",
-    padding: "0",
-  },
-  ".cm-line": {
-    paddingLeft: "0.5rem",
-    paddingRight: "0.5rem",
-    fontSize: "1rem",
-    lineHeight: "1.75rem",
-  },
-  ".cm-gutterElement": {
-    fontSize: "0.8125rem",
-    lineHeight: "1.75rem",
-    display: "flex",
-    alignItems: "flex-start",
-    padding: "0 8px 0 16px",
-    justifyContent: "flex-end",
-  },
-  "&.cm-focused": { outline: "none" },
-  ".cm-activeLine": { backgroundColor: "transparent" },
-  ".cm-activeLineGutter": {
-    backgroundColor: "transparent",
-    color: "var(--foreground)",
-    opacity: "1",
-  },
-  ".cm-activeLineGutter .cm-fold-marker": {
-    opacity: "1",
-    color: "var(--foreground)",
-  },
-  ".cm-hovered-gutter .cm-fold-marker": {
-    opacity: "0.5",
-  },
-  ".cm-foldGutter .cm-gutterElement": {
-    padding: "0 4px",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "center",
-  },
-  ".cm-fold-marker": {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    height: "1.75rem",
-    opacity: "0",
-    transition: "opacity 0.2s, color 0.2s",
-  },
-  ".cm-gutters:hover .cm-fold-marker": {
-    opacity: "0.5",
-  },
-  ".cm-fold-marker:hover": {
-    opacity: "1 !important",
-    color: "var(--foreground)",
-  },
-  ".cm-code-block-line": {
-    backgroundColor: "var(--muted)",
-  },
-  ".cm-hr": {
-    display: "inline-block",
-    verticalAlign: "middle",
-    borderTop: "2px solid var(--border)",
-    width: "100%",
-    height: "0",
-    pointerEvents: "none",
-  },
-  ".cm-list-bullet": {
-    color: "var(--primary)",
-    fontWeight: "bold",
-  },
-  ".cm-list-number": {
-    color: "var(--muted-foreground)",
-  },
-});
+export const getEditorTheme = (fontSize: number) =>
+  EditorView.theme({
+    "&": { height: "100%", width: "100%", backgroundColor: "transparent" },
+    ".cm-scroller": {
+      display: "grid !important",
+      gridTemplateColumns: "1fr minmax(0, 48rem) 1fr",
+      width: "100%",
+      overflow: "auto",
+      fontFamily:
+        "var(--font-sans, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif)",
+      scrollbarGutter: "stable",
+      paddingTop: "2.5rem",
+      paddingBottom: "50vh",
+    },
+    ".cm-gutters": {
+      gridColumn: "1",
+      justifySelf: "end",
+      display: "flex",
+      backgroundColor: "transparent",
+      borderRight: "none",
+      color: "var(--muted-foreground)",
+      opacity: "0.8",
+    },
+    ".cm-content": {
+      gridColumn: "2",
+      width: "100%",
+      maxWidth: "48rem",
+      padding: "0",
+    },
+    ".cm-line": {
+      paddingLeft: "0.5rem",
+      paddingRight: "0.5rem",
+      fontSize: `${fontSize}px`,
+      lineHeight: "1.75rem",
+    },
+    ".cm-gutterElement": {
+      fontSize: "0.8125rem",
+      lineHeight: "1.75rem",
+      display: "flex",
+      alignItems: "flex-start",
+      padding: "0 8px 0 16px",
+      justifyContent: "flex-end",
+    },
+    "&.cm-focused": { outline: "none" },
+    ".cm-activeLine": { backgroundColor: "transparent" },
+    ".cm-activeLineGutter": {
+      backgroundColor: "transparent",
+      color: "var(--foreground)",
+      opacity: "1",
+    },
+    ".cm-activeLineGutter .cm-fold-marker": {
+      opacity: "1",
+      color: "var(--foreground)",
+    },
+    ".cm-hovered-gutter .cm-fold-marker": {
+      opacity: "0.5",
+    },
+    ".cm-foldGutter .cm-gutterElement": {
+      padding: "0 4px",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "flex-start",
+      justifyContent: "center",
+    },
+    ".cm-fold-marker": {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      height: "1.75rem",
+      opacity: "0",
+      transition: "opacity 0.2s, color 0.2s",
+    },
+    ".cm-gutters:hover .cm-fold-marker": {
+      opacity: "0.5",
+    },
+    ".cm-fold-marker:hover": {
+      opacity: "1 !important",
+      color: "var(--foreground)",
+    },
+    ".cm-code-block-line": {
+      backgroundColor: "var(--muted)",
+    },
+    ".cm-hr": {
+      display: "inline-block",
+      verticalAlign: "middle",
+      borderTop: "2px solid var(--border)",
+      width: "100%",
+      height: "0",
+      pointerEvents: "none",
+    },
+    ".cm-list-bullet": {
+      color: "var(--primary)",
+      fontWeight: "bold",
+    },
+    ".cm-list-number": {
+      color: "var(--muted-foreground)",
+    },
+  });
 
 export const getDefaultExtensions = (
   onDocChange: (newContent: string, view: EditorView) => void,
-  mode: "source" | "live" = "source"
+  mode: "source" | "live" = "source",
+  fontSize: number = 18
 ) => {
   const extensions = [
     lineNumbers(),
@@ -491,7 +493,7 @@ export const getDefaultExtensions = (
         onDocChange(update.state.doc.toString(), update.view);
       }
     }),
-    editorTheme,
+    getEditorTheme(fontSize),
     codeBlockPlugin,
     hoveredLineField,
     hoverPlugin,

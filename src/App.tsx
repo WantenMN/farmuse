@@ -6,6 +6,7 @@ import { PathPalette } from "./components/PathPalette";
 import { FileExplorer } from "./components/FileExplorer";
 import { SideBar } from "./components/SideBar";
 import { Editor } from "./components/Editor";
+import { SettingsPage } from "./components/SettingsPage";
 import { Tabs } from "./components/Tabs";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { useWorkspace } from "./hooks/useWorkspace";
@@ -157,6 +158,8 @@ function App() {
         <SideBar
           showExplorer={showExplorer}
           onToggleExplorer={() => setShowExplorer(!showExplorer)}
+          onOpenSettings={() => openFile("settings://", "Settings")}
+          activePath={activeFilePath}
         />
         <FileExplorer
           currentPath={currentPath}
@@ -179,11 +182,15 @@ function App() {
           )}
 
           {activeFile ? (
-            <Editor
-              key={activeFile.path}
-              path={activeFile.path}
-              name={activeFile.name}
-            />
+            activeFile.path === "settings://" ? (
+              <SettingsPage />
+            ) : (
+              <Editor
+                key={activeFile.path}
+                path={activeFile.path}
+                name={activeFile.name}
+              />
+            )
           ) : (
             <WelcomeScreen currentPath={currentPath} />
           )}

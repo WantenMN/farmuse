@@ -2,6 +2,7 @@ import * as React from "react";
 import { EditorView } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { useEditor } from "../hooks/useEditor";
+import { useSettingsStore } from "../store/settingsStore";
 import { EditorEmptyState } from "./Editor/EditorEmptyState";
 import { EditorLoadingState } from "./Editor/EditorLoadingState";
 import { EditorErrorState } from "./Editor/EditorErrorState";
@@ -16,6 +17,7 @@ interface EditorProps {
 export function Editor({ path, name }: EditorProps) {
   const { content, setContent, error, loading, isSaving, lastSavedContent } =
     useEditor({ path, name });
+  const fontSize = useSettingsStore((state) => state.fontSize);
 
   const [mode, setMode] = React.useState<EditorMode>("live");
   const editorRef = React.useRef<HTMLDivElement>(null);
@@ -36,15 +38,19 @@ export function Editor({ path, name }: EditorProps) {
 
     const state = EditorState.create({
       doc: content || "",
-      extensions: getDefaultExtensions((newContent, view) => {
-        setContent(newContent);
-        view.dispatch({
-          effects: EditorView.scrollIntoView(view.state.selection.main, {
-            y: "nearest",
-            yMargin: 5 * view.defaultLineHeight,
-          }),
-        });
-      }, mode),
+      extensions: getDefaultExtensions(
+        (newContent, view) => {
+          setContent(newContent);
+          view.dispatch({
+            effects: EditorView.scrollIntoView(view.state.selection.main, {
+              y: "nearest",
+              yMargin: 5 * view.defaultLineHeight,
+            }),
+          });
+        },
+        mode,
+        fontSize
+      ),
     });
 
     const view = new EditorView({
@@ -61,7 +67,7 @@ export function Editor({ path, name }: EditorProps) {
       isInitialized.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, hasContent, mode]);
+  }, [path, hasContent, mode, fontSize]);
 
   // Sync content from state to editor
   React.useEffect(() => {
