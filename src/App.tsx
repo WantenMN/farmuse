@@ -4,6 +4,7 @@ import { ResizeHandles } from "./components/ResizeHandles";
 import { CommandPalette } from "./components/CommandPalette";
 import { PathPalette } from "./components/PathPalette";
 import { FileExplorer } from "./components/FileExplorer";
+import { SideBar } from "./components/SideBar";
 import { Editor } from "./components/Editor";
 import { Tabs } from "./components/Tabs";
 import { WelcomeScreen } from "./components/WelcomeScreen";
@@ -153,6 +154,10 @@ function App() {
       <ResizeHandles />
       <TitleBar />
       <div className="flex flex-1 overflow-hidden">
+        <SideBar
+          showExplorer={showExplorer}
+          onToggleExplorer={() => setShowExplorer(!showExplorer)}
+        />
         <FileExplorer
           currentPath={currentPath}
           entries={entries}
