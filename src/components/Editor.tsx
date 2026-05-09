@@ -3,7 +3,6 @@ import { EditorView } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { useEditor } from "../hooks/useEditor";
 import { EditorEmptyState } from "./Editor/EditorEmptyState";
-import { EditorUnsupportedState } from "./Editor/EditorUnsupportedState";
 import { EditorLoadingState } from "./Editor/EditorLoadingState";
 import { EditorErrorState } from "./Editor/EditorErrorState";
 import { EditorStatusBar } from "./Editor/EditorStatusBar";
@@ -22,7 +21,6 @@ export function Editor({ path, name }: EditorProps) {
     loading,
     isSaving,
     lastSavedContent,
-    isMarkdown,
   } = useEditor({ path, name });
 
   const editorRef = React.useRef<HTMLDivElement>(null);
@@ -34,7 +32,6 @@ export function Editor({ path, name }: EditorProps) {
   React.useEffect(() => {
     if (
       !editorRef.current ||
-      !isMarkdown ||
       !hasContent ||
       isInitialized.current
     )
@@ -67,7 +64,7 @@ export function Editor({ path, name }: EditorProps) {
       isInitialized.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, isMarkdown, hasContent]);
+  }, [path, hasContent]);
 
   // Sync content from state to editor
   React.useEffect(() => {
@@ -82,7 +79,6 @@ export function Editor({ path, name }: EditorProps) {
   }, [content]);
 
   if (!path) return <EditorEmptyState />;
-  if (!isMarkdown) return <EditorUnsupportedState />;
   if (loading) return <EditorLoadingState name={name} />;
   if (error) return <EditorErrorState error={error} />;
 

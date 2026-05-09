@@ -23,21 +23,11 @@ export function useEditor({ path, name }: UseEditorProps) {
     () => (path ? lastSavedContentCache.get(path) || null : null)
   );
 
-  const isMarkdown = React.useMemo(() => {
-    return name?.toLowerCase().endsWith(".md") || false;
-  }, [name]);
-
   // Load file content
   React.useEffect(() => {
     if (!path || contentCache.has(path)) {
-      if (path && !isMarkdown) {
-        setLoading(false);
-        setContent(null);
-      }
       return;
     }
-
-    if (!isMarkdown) return;
 
     const loadFile = async () => {
       setLoading(true);
@@ -60,7 +50,7 @@ export function useEditor({ path, name }: UseEditorProps) {
     };
 
     loadFile();
-  }, [path, isMarkdown]);
+  }, [path]);
 
   // Update caches
   React.useEffect(() => {
@@ -98,7 +88,7 @@ export function useEditor({ path, name }: UseEditorProps) {
 
   // File watcher
   React.useEffect(() => {
-    if (!path || !isMarkdown) return;
+    if (!path) return;
 
     invoke("watch_file", { path }).catch(console.error);
 
@@ -125,7 +115,7 @@ export function useEditor({ path, name }: UseEditorProps) {
       unlistenPromise.then((unlisten) => unlisten());
       invoke("unwatch_file").catch(console.error);
     };
-  }, [path, isMarkdown]);
+  }, [path]);
 
   return {
     content,
@@ -134,6 +124,5 @@ export function useEditor({ path, name }: UseEditorProps) {
     loading,
     isSaving,
     lastSavedContent,
-    isMarkdown,
   };
 }
