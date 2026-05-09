@@ -1,7 +1,29 @@
+import * as React from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 export function ResizeHandles() {
+  const [isDisabled, setIsDisabled] = React.useState(false);
   const appWindow = getCurrentWindow();
+
+  React.useEffect(() => {
+    const updateState = async () => {
+      const maximized = await appWindow.isMaximized();
+      const fullscreen = await appWindow.isFullscreen();
+      setIsDisabled(maximized || fullscreen);
+    };
+
+    updateState();
+
+    const unlisten = appWindow.onResized(() => {
+      updateState();
+    });
+
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [appWindow]);
+
+  if (isDisabled) return null;
 
   const handleResize = async (
     edge:
