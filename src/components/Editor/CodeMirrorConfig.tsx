@@ -11,6 +11,7 @@ import {
   ViewPlugin,
   DecorationSet,
   ViewUpdate,
+  WidgetType,
 } from "@codemirror/view";
 import {
   foldGutter,
@@ -79,6 +80,39 @@ export const markdownHighlightStyle = HighlightStyle.define([
 const hideDecoration = Decoration.replace({});
 const codeBlockLineDecoration = Decoration.line({
   class: "cm-code-block-line",
+});
+
+class BulletWidget extends WidgetType {
+  toDOM() {
+    const span = document.createElement("span");
+    span.className = "cm-list-bullet";
+    span.textContent = "•";
+    return span;
+  }
+}
+
+class NumberWidget extends WidgetType {
+  constructor(readonly text: string) {
+    super();
+  }
+  toDOM() {
+    const span = document.createElement("span");
+    span.className = "cm-list-number";
+    span.textContent = this.text;
+    return span;
+  }
+}
+
+class HRWidget extends WidgetType {
+  toDOM() {
+    const hr = document.createElement("span");
+    hr.className = "cm-hr";
+    return hr;
+  }
+}
+
+const hrDecoration = Decoration.replace({
+  widget: new HRWidget(),
 });
 
 const codeBlockPlugin = ViewPlugin.fromClass(
@@ -243,6 +277,16 @@ const livePreviewPlugin = ViewPlugin.fromClass(
           enter: (node) => {
             if (node.from < from || node.from < lastPos) return;
 
+            if (node.name === "HorizontalRule") {
+              const isSelected =
+                selection.from <= node.to && selection.to >= node.from;
+              if (!isSelected) {
+                builder.add(node.from, node.to, hrDecoration);
+                lastPos = node.from;
+              }
+              return;
+            }
+
             const marks = [
               "HeaderMark",
               "EmphasisMark",
@@ -265,7 +309,39 @@ const livePreviewPlugin = ViewPlugin.fromClass(
                   selection.to >= container.from;
 
                 if (!isSelected) {
-                  builder.add(node.from, node.to, hideDecoration);
+                  let markTo = node.to;
+                  if (node.name === "HeaderMark") {
+                    const nextChar = view.state.doc.sliceString(
+                      node.to,
+                      node.to + 1
+                    );
+                    if (nextChar === " ") {
+                      markTo += 1;
+                    }
+                  }
+
+                  if (node.name === "ListMark") {
+                    const text = view.state.doc.sliceString(node.from, node.to);
+                    if (/[0-9]/.test(text)) {
+                      builder.add(
+                        node.from,
+                        node.to,
+                        Decoration.replace({
+                          widget: new NumberWidget(text),
+                        })
+                      );
+                    } else {
+                      builder.add(
+                        node.from,
+                        node.to,
+                        Decoration.replace({
+                          widget: new BulletWidget(),
+                        })
+                      );
+                    }
+                  } else {
+                    builder.add(node.from, markTo, hideDecoration);
+                  }
                   lastPos = node.from;
                 }
               }
@@ -360,6 +436,21 @@ export const editorTheme = EditorView.theme({
   },
   ".cm-code-block-line": {
     backgroundColor: "var(--muted)",
+  },
+  ".cm-hr": {
+    display: "inline-block",
+    verticalAlign: "middle",
+    borderTop: "2px solid var(--border)",
+    width: "100%",
+    height: "0",
+    pointerEvents: "none",
+  },
+  ".cm-list-bullet": {
+    color: "var(--primary)",
+    fontWeight: "bold",
+  },
+  ".cm-list-number": {
+    color: "var(--muted-foreground)",
   },
 });
 
