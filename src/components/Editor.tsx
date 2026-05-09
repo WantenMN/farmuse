@@ -86,10 +86,6 @@ export function Editor({ path, name }: EditorProps) {
   const isInitialized = React.useRef(false);
   const hasContent = content !== null;
 
-  React.useEffect(() => {
-    isInitialized.current = false;
-  }, [path]);
-
   // Initialize CodeMirror
   React.useEffect(() => {
     if (
@@ -110,6 +106,13 @@ export function Editor({ path, name }: EditorProps) {
           if (update.docChanged) {
             const newContent = update.state.doc.toString();
             setContent(newContent);
+
+            update.view.dispatch({
+              effects: EditorView.scrollIntoView(update.state.selection.main, {
+                y: "nearest",
+                yMargin: 5 * update.view.defaultLineHeight,
+              }),
+            });
           }
         }),
         EditorView.theme({
@@ -119,20 +122,35 @@ export function Editor({ path, name }: EditorProps) {
             backgroundColor: "transparent",
           },
           ".cm-scroller": {
+            display: "grid !important",
+            gridTemplateColumns: "1fr minmax(0, 48rem) 1fr",
+            width: "100%",
             overflow: "auto",
             fontFamily:
               "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace)",
             scrollbarGutter: "stable",
-            paddingTop: "2.5rem", // pt-10
-            paddingBottom: "120px", // pb-[120px]
-            paddingLeft: "max(2rem, calc((100% - 48rem) / 2 + 2rem))",
-            paddingRight: "max(2rem, calc((100% - 48rem) / 2 + 2rem))",
+            paddingTop: "2.5rem",
+            paddingBottom: "50vh",
           },
           ".cm-gutters": {
+            gridColumn: "1",
+            justifySelf: "end",
+            display: "flex",
             backgroundColor: "transparent",
             borderRight: "none",
             color: "var(--muted-foreground)",
             opacity: "0.5",
+          },
+          ".cm-content": {
+            gridColumn: "2",
+            width: "100%",
+            maxWidth: "48rem",
+            padding: "0",
+          },
+          ".cm-layer": {
+            gridColumn: "1 / span 3",
+            width: "100%",
+            maxWidth: "none !important",
           },
           ".cm-gutterElement": {
             padding: "0 8px 0 16px",
@@ -140,12 +158,9 @@ export function Editor({ path, name }: EditorProps) {
             alignItems: "center",
             justifyContent: "flex-end",
           },
-          ".cm-content": {
-            padding: "0",
-          },
           ".cm-line": {
-            paddingLeft: "0.5rem", // 紧贴 gutter 但保留微小间距
-            paddingRight: "0",
+            paddingLeft: "0.5rem",
+            paddingRight: "0.5rem",
             fontSize: "0.875rem", // text-sm
             lineHeight: "1.625", // leading-relaxed
           },
@@ -180,8 +195,10 @@ export function Editor({ path, name }: EditorProps) {
     return () => {
       view.destroy();
       viewRef.current = null;
+      isInitialized.current = false;
     };
-  }, [path, isMarkdown, hasContent, content]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, isMarkdown, hasContent]);
 
   // Sync content from state to editor (for watcher or external changes)
   React.useEffect(() => {
