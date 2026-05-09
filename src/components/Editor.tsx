@@ -2,9 +2,26 @@ import * as React from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { FileText, AlertCircle, Save } from "lucide-react";
-import { EditorView, basicSetup } from "codemirror";
-import { markdown } from "@codemirror/lang-markdown";
+import {
+  EditorView,
+  lineNumbers,
+  dropCursor,
+  highlightActiveLine,
+  keymap,
+} from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
+import {
+  foldGutter,
+  indentOnInput,
+  syntaxHighlighting,
+  defaultHighlightStyle,
+  bracketMatching,
+} from "@codemirror/language";
+import { history, defaultKeymap, historyKeymap } from "@codemirror/commands";
+import {
+  closeBrackets,
+} from "@codemirror/autocomplete";
+import { markdown } from "@codemirror/lang-markdown";
 
 interface EditorProps {
   path: string | null;
@@ -99,7 +116,19 @@ export function Editor({ path, name }: EditorProps) {
     const state = EditorState.create({
       doc: content || "",
       extensions: [
-        basicSetup,
+        lineNumbers(),
+        history(),
+        foldGutter(),
+        dropCursor(),
+        indentOnInput(),
+        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+        bracketMatching(),
+        closeBrackets(),
+        highlightActiveLine(),
+        keymap.of([
+          ...defaultKeymap,
+          ...historyKeymap,
+        ]),
         markdown(),
         EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {
