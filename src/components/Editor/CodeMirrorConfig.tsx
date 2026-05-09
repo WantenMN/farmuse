@@ -1,3 +1,6 @@
+import * as React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { ChevronRight, ChevronDown } from "lucide-react";
 import {
   EditorView,
   lineNumbers,
@@ -22,7 +25,7 @@ import { tags as t } from "@lezer/highlight";
 import { history, defaultKeymap, historyKeymap } from "@codemirror/commands";
 import { closeBrackets } from "@codemirror/autocomplete";
 import { markdown } from "@codemirror/lang-markdown";
-import { RangeSetBuilder } from "@codemirror/state";
+import { RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 
 export const markdownHighlightStyle = HighlightStyle.define([
   {
@@ -128,6 +131,87 @@ const codeBlockPlugin = ViewPlugin.fromClass(
   }
 );
 
+const setHoveredLine = StateEffect.define<number | null>();
+const hoveredLineField = StateField.define<number | null>({
+  create: () => null,
+  update(value, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setHoveredLine)) return effect.value;
+    }
+    return value;
+  },
+});
+
+const hoverPlugin = EditorView.domEventHandlers({
+  mousemove(event, view) {
+    const rect = view.contentDOM.getBoundingClientRect();
+    // Check vertical position relative to the center of the content to be more robust
+    const x = rect.left + rect.width / 2;
+    const pos = view.posAtCoords({ x, y: event.clientY });
+
+    if (pos !== null) {
+      try {
+        const line = view.state.doc.lineAt(pos).number;
+        if (view.state.field(hoveredLineField) !== line) {
+          view.dispatch({ effects: setHoveredLine.of(line) });
+        }
+      } catch {
+        // Position might be out of bounds
+      }
+    } else {
+      if (view.state.field(hoveredLineField) !== null) {
+        view.dispatch({ effects: setHoveredLine.of(null) });
+      }
+    }
+  },
+  mouseleave(_event, view) {
+    view.dispatch({ effects: setHoveredLine.of(null) });
+  },
+});
+
+const gutterHoverPlugin = ViewPlugin.fromClass(
+  class {
+    update(update: ViewUpdate) {
+      if (
+        update.docChanged ||
+        update.viewportChanged ||
+        update.startState.field(hoveredLineField) !==
+          update.state.field(hoveredLineField)
+      ) {
+        this.apply(update.view);
+      }
+    }
+
+    apply(view: EditorView) {
+      const hoveredLineNum = view.state.field(hoveredLineField);
+      const foldGutter = view.dom.querySelector(".cm-foldGutter");
+      if (!foldGutter) return;
+
+      const gutterElements = foldGutter.querySelectorAll(".cm-gutterElement");
+
+      // Reset all
+      gutterElements.forEach((el) => el.classList.remove("cm-hovered-gutter"));
+
+      if (hoveredLineNum !== null) {
+        try {
+          const line = view.state.doc.line(hoveredLineNum);
+          const lineBlock = view.lineBlockAt(line.from);
+          // Find the gutter element at the same vertical position
+          for (const el of gutterElements) {
+            const htmlEl = el as HTMLElement;
+            if (Math.abs(htmlEl.offsetTop - lineBlock.top) < 2) {
+              htmlEl.classList.add("cm-hovered-gutter");
+              break;
+            }
+          }
+        } catch {
+          // Line might not be in doc anymore
+        }
+      }
+    }
+  }
+);
+
 const livePreviewPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
@@ -217,7 +301,7 @@ export const editorTheme = EditorView.theme({
     backgroundColor: "transparent",
     borderRight: "none",
     color: "var(--muted-foreground)",
-    opacity: "0.5",
+    opacity: "0.8",
   },
   ".cm-content": {
     gridColumn: "2",
@@ -229,7 +313,15 @@ export const editorTheme = EditorView.theme({
     paddingLeft: "0.5rem",
     paddingRight: "0.5rem",
     fontSize: "1rem",
-    lineHeight: "1.75",
+    lineHeight: "1.75rem",
+  },
+  ".cm-gutterElement": {
+    fontSize: "0.8125rem",
+    lineHeight: "1.75rem",
+    display: "flex",
+    alignItems: "center",
+    padding: "0 8px 0 16px",
+    justifyContent: "flex-end",
   },
   "&.cm-focused": { outline: "none" },
   ".cm-activeLine": { backgroundColor: "transparent" },
@@ -237,6 +329,34 @@ export const editorTheme = EditorView.theme({
     backgroundColor: "transparent",
     color: "var(--foreground)",
     opacity: "1",
+  },
+  ".cm-activeLineGutter .cm-fold-marker": {
+    opacity: "1",
+    color: "var(--foreground)",
+  },
+  ".cm-hovered-gutter .cm-fold-marker": {
+    opacity: "0.5",
+  },
+  ".cm-foldGutter .cm-gutterElement": {
+    padding: "0 4px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ".cm-fold-marker": {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    opacity: "0",
+    transition: "opacity 0.2s, color 0.2s",
+  },
+  ".cm-gutters:hover .cm-fold-marker": {
+    opacity: "0.5",
+  },
+  ".cm-fold-marker:hover": {
+    opacity: "1 !important",
+    color: "var(--foreground)",
   },
   ".cm-code-block-line": {
     backgroundColor: "var(--muted)",
@@ -250,7 +370,20 @@ export const getDefaultExtensions = (
   const extensions = [
     lineNumbers(),
     history(),
-    foldGutter(),
+    foldGutter({
+      markerDOM: (open) => {
+        const iconContainer = document.createElement("div");
+        iconContainer.className = "cm-fold-marker";
+        iconContainer.innerHTML = renderToStaticMarkup(
+          open ? (
+            <ChevronDown size={14} strokeWidth={2.5} />
+          ) : (
+            <ChevronRight size={14} strokeWidth={2.5} />
+          )
+        );
+        return iconContainer;
+      },
+    }),
     dropCursor(),
     indentOnInput(),
     syntaxHighlighting(markdownHighlightStyle),
@@ -268,6 +401,9 @@ export const getDefaultExtensions = (
     }),
     editorTheme,
     codeBlockPlugin,
+    hoveredLineField,
+    hoverPlugin,
+    gutterHoverPlugin,
   ];
 
   if (mode === "live") {
