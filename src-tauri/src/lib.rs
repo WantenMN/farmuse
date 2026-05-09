@@ -27,6 +27,17 @@ fn list_directory_contents(path: String) -> Result<Vec<FileEntry>, String> {
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().to_string();
             let is_dir = path.is_dir();
+
+            // Filter out hidden entries (names starting with dot)
+            if name.starts_with('.') {
+                continue;
+            }
+
+            // If it's a file, only include if it's a markdown file
+            if !is_dir && !name.to_lowercase().ends_with(".md") {
+                continue;
+            }
+
             result.push(FileEntry {
                 name,
                 path: path.to_string_lossy().to_string(),
@@ -61,8 +72,9 @@ fn list_subdirs(path: String) -> Result<Vec<String>, String> {
 
     for entry in entries {
         if let Ok(entry) = entry {
-            if entry.path().is_dir() {
-                result.push(entry.file_name().to_string_lossy().to_string());
+            let name = entry.file_name().to_string_lossy().to_string();
+            if entry.path().is_dir() && !name.starts_with('.') {
+                result.push(name);
             }
         }
     }
