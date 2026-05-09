@@ -126,6 +126,22 @@ function App() {
     [activeFilePath]
   );
 
+  const closeOthers = React.useCallback((path: string) => {
+    setOpenFiles((prev) => {
+      const fileToKeep = prev.find((f) => f.path === path);
+      if (fileToKeep) {
+        setActiveFilePath(path);
+        return [fileToKeep];
+      }
+      return prev;
+    });
+  }, []);
+
+  const closeAll = React.useCallback(() => {
+    setOpenFiles([]);
+    setActiveFilePath(null);
+  }, []);
+
   React.useEffect(() => {
     registerAppCommands({
       toggleExplorer: () => setShowExplorer((prev: boolean) => !prev),
@@ -167,6 +183,8 @@ function App() {
               activePath={activeFilePath}
               onSelect={setActiveFilePath}
               onClose={closeFile}
+              onCloseOthers={closeOthers}
+              onCloseAll={closeAll}
             />
           )}
 
