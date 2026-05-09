@@ -1,5 +1,6 @@
 import * as React from "react";
 import { TitleBar } from "./components/TitleBar";
+import { ResizeHandles } from "./components/ResizeHandles";
 import { CommandPalette } from "./components/CommandPalette";
 import { PathPalette } from "./components/PathPalette";
 import { FileExplorer } from "./components/FileExplorer";
@@ -136,7 +137,8 @@ function App() {
   }, [activeFilePath, closeFile]);
 
   return (
-    <div className="bg-background text-foreground flex h-screen w-screen flex-col overflow-hidden">
+    <div className="bg-background text-foreground border-border flex h-screen w-screen flex-col overflow-hidden border">
+      <ResizeHandles />
       <TitleBar />
       <div className="flex flex-1 overflow-hidden">
         <FileExplorer
