@@ -14,12 +14,16 @@ interface FileExplorerProps {
   currentPath: string | null;
   entries: RawFileEntry[];
   isVisible: boolean;
+  width: number;
+  onResizeStart: () => void;
 }
 
 export function FileExplorer({
   currentPath,
   entries: rootEntries,
   isVisible,
+  width,
+  onResizeStart,
 }: FileExplorerProps) {
   const [entries, setEntries] = React.useState<FileEntry[]>([]);
   const [expandedPaths, setExpandedPaths] = React.useState<Set<string>>(
@@ -426,15 +430,24 @@ export function FileExplorer({
     };
   }, [entries, focusedIndex, isActive, expandedPaths, toggleFolder]);
 
-  if (!isVisible) return null;
-
   return (
     <aside
       className={cn(
-        "bg-muted/30 focus-within:ring-primary/20 focus-within:bg-muted/50 flex h-full w-64 shrink-0 flex-col overflow-hidden border-r focus-within:ring-1 focus-within:ring-inset",
-        isActive && "bg-muted/50"
+        "bg-muted/30 focus-within:ring-primary/20 focus-within:bg-muted/50 group relative flex h-full shrink-0 flex-col overflow-hidden border-r focus-within:ring-1 focus-within:ring-inset",
+        isActive && "bg-muted/50",
+        !isVisible && "hidden"
       )}
+      style={{ width: `${width}px` }}
     >
+      <div
+        className="hover:bg-primary/30 active:bg-primary/50 absolute top-0 right-0 z-50 h-full w-1 cursor-col-resize transition-colors"
+        onMouseDown={(e) => {
+          if (e.button === 0) {
+            e.preventDefault();
+            onResizeStart();
+          }
+        }}
+      />
       <div className="bg-background/50 flex min-h-[48px] items-center gap-2 overflow-hidden border-b p-3">
         <Folder className="text-primary/70 h-4 w-4 shrink-0" />
         <h2

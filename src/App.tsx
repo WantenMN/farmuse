@@ -6,6 +6,7 @@ import { PathPalette } from "./components/PathPalette";
 import { FileExplorer } from "./components/FileExplorer";
 import { Editor } from "./components/Editor";
 import { Tabs } from "./components/Tabs";
+import { useExplorerResize } from "./hooks/useExplorerResize";
 import { invoke } from "@tauri-apps/api/core";
 import { commandManager } from "./systems/commandManager";
 import {
@@ -32,9 +33,18 @@ function App() {
     savedState?.currentPath || null
   );
   const [entries, setEntries] = React.useState<FileEntry[]>([]);
-  const [showExplorer, setShowExplorer] = React.useState(
-    savedState?.showExplorer !== undefined ? savedState.showExplorer : true
-  );
+
+  const {
+    width: explorerWidth,
+    isVisible: showExplorer,
+    setIsVisible: setShowExplorer,
+    startResizing,
+  } = useExplorerResize({
+    initialWidth: savedState?.explorerWidth || 256,
+    initialVisible:
+      savedState?.showExplorer !== undefined ? savedState.showExplorer : true,
+  });
+
   const [openFiles, setOpenFiles] = React.useState<
     {
       path: string;
@@ -72,7 +82,7 @@ function App() {
         alert("Failed to open directory: " + e);
       }
     },
-    []
+    [setShowExplorer]
   );
 
   // Restore directory entries on mount if we have a path
@@ -90,9 +100,10 @@ function App() {
       openFiles,
       activeFilePath,
       showExplorer,
+      explorerWidth,
     };
     localStorage.setItem("farmuse_state", JSON.stringify(state));
-  }, [currentPath, openFiles, activeFilePath, showExplorer]);
+  }, [currentPath, openFiles, activeFilePath, showExplorer, explorerWidth]);
 
   const openFile = React.useCallback((path: string, name: string) => {
     setOpenFiles((prev) => {
@@ -134,7 +145,7 @@ function App() {
     return () => {
       unregisterAppCommands();
     };
-  }, [activeFilePath, closeFile]);
+  }, [activeFilePath, closeFile, setShowExplorer]);
 
   return (
     <div className="bg-background text-foreground border-border flex h-screen w-screen flex-col overflow-hidden border">
@@ -145,6 +156,8 @@ function App() {
           currentPath={currentPath}
           entries={entries}
           isVisible={showExplorer}
+          width={explorerWidth}
+          onResizeStart={startResizing}
         />
 
         <main className="flex min-w-0 flex-1 flex-col">
