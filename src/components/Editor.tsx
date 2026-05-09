@@ -16,11 +16,11 @@ import {
   syntaxHighlighting,
   defaultHighlightStyle,
   bracketMatching,
+  HighlightStyle,
 } from "@codemirror/language";
+import { tags as t } from "@lezer/highlight";
 import { history, defaultKeymap, historyKeymap } from "@codemirror/commands";
-import {
-  closeBrackets,
-} from "@codemirror/autocomplete";
+import { closeBrackets } from "@codemirror/autocomplete";
 import { markdown } from "@codemirror/lang-markdown";
 
 interface EditorProps {
@@ -31,6 +31,51 @@ interface EditorProps {
 // Global caches to persist during the session (tab switching)
 const contentCache = new Map<string, string>();
 const lastSavedContentCache = new Map<string, string>();
+
+const markdownHighlightStyle = HighlightStyle.define([
+  {
+    tag: t.heading1,
+    fontSize: "1.5rem",
+    fontWeight: "700",
+    textDecoration: "none",
+    color: "var(--foreground)",
+  },
+  {
+    tag: t.heading2,
+    fontSize: "1.375rem",
+    fontWeight: "700",
+    textDecoration: "none",
+    color: "var(--foreground)",
+  },
+  {
+    tag: t.heading3,
+    fontSize: "1.25rem",
+    fontWeight: "600",
+    textDecoration: "none",
+    color: "var(--foreground)",
+  },
+  {
+    tag: t.heading4,
+    fontSize: "1.125rem",
+    fontWeight: "600",
+    textDecoration: "none",
+    color: "var(--foreground)",
+  },
+  {
+    tag: t.heading5,
+    fontSize: "1rem",
+    fontWeight: "600",
+    textDecoration: "none",
+    color: "var(--foreground)",
+  },
+  {
+    tag: t.heading6,
+    fontSize: "0.875rem",
+    fontWeight: "600",
+    textDecoration: "none",
+    color: "var(--foreground)",
+  },
+]);
 
 export function Editor({ path, name }: EditorProps) {
   const [content, setContent] = React.useState<string | null>(() =>
@@ -121,14 +166,12 @@ export function Editor({ path, name }: EditorProps) {
         foldGutter(),
         dropCursor(),
         indentOnInput(),
+        syntaxHighlighting(markdownHighlightStyle),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         bracketMatching(),
         closeBrackets(),
         highlightActiveLine(),
-        keymap.of([
-          ...defaultKeymap,
-          ...historyKeymap,
-        ]),
+        keymap.of([...defaultKeymap, ...historyKeymap]),
         markdown(),
         EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {
