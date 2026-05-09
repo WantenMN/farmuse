@@ -64,10 +64,37 @@ function App() {
 
   const loadDirectory = React.useCallback(
     async (path: string, shouldFocus = true) => {
+      // Save current state before switching if path is different
+      if (currentPath && currentPath !== path) {
+        localStorage.setItem(
+          `tabs_state_${currentPath}`,
+          JSON.stringify({ openFiles, activeFilePath })
+        );
+      }
+
       try {
         const result = await invoke<FileEntry[]>("list_directory_contents", {
           path,
         });
+
+        // Load saved state for the new path if switching folders
+        if (path !== currentPath) {
+          const saved = localStorage.getItem(`tabs_state_${path}`);
+          if (saved) {
+            try {
+              const { openFiles: savedFiles, activeFilePath: savedActive } =
+                JSON.parse(saved);
+              setOpenFiles(savedFiles);
+              setActiveFilePath(savedActive);
+            } catch (e) {
+              console.error("Failed to parse saved tabs state", e);
+            }
+          } else {
+            setOpenFiles([]);
+            setActiveFilePath(null);
+          }
+        }
+
         setEntries(result);
         setCurrentPath(path);
         if (shouldFocus) {
@@ -82,7 +109,7 @@ function App() {
         alert("Failed to open directory: " + e);
       }
     },
-    [setShowExplorer]
+    [currentPath, openFiles, activeFilePath, setShowExplorer]
   );
 
   // Restore directory entries on mount if we have a path
@@ -103,6 +130,14 @@ function App() {
       explorerWidth,
     };
     localStorage.setItem("farmuse_state", JSON.stringify(state));
+
+    // Also save folder-specific tab state
+    if (currentPath) {
+      localStorage.setItem(
+        `tabs_state_${currentPath}`,
+        JSON.stringify({ openFiles, activeFilePath })
+      );
+    }
   }, [currentPath, openFiles, activeFilePath, showExplorer, explorerWidth]);
 
   const openFile = React.useCallback((path: string, name: string) => {
@@ -142,15 +177,23 @@ function App() {
     setActiveFilePath(null);
   }, []);
 
+  const closeFolder = React.useCallback(() => {
+    if (currentPath) {
+      localStorage.setItem(
+        `tabs_state_${currentPath}`,
+        JSON.stringify({ openFiles, activeFilePath })
+      );
+    }
+    setCurrentPath(null);
+    setEntries([]);
+    setOpenFiles([]);
+    setActiveFilePath(null);
+  }, [currentPath, openFiles, activeFilePath]);
+
   React.useEffect(() => {
     registerAppCommands({
       toggleExplorer: () => setShowExplorer((prev: boolean) => !prev),
-      closeFolder: () => {
-        setCurrentPath(null);
-        setEntries([]);
-        setOpenFiles([]);
-        setActiveFilePath(null);
-      },
+      closeFolder,
       closeFile: () => {
         if (activeFilePath) {
           closeFile(activeFilePath);
@@ -161,7 +204,7 @@ function App() {
     return () => {
       unregisterAppCommands();
     };
-  }, [activeFilePath, closeFile, setShowExplorer]);
+  }, [activeFilePath, closeFile, closeFolder, setShowExplorer]);
 
   return (
     <div className="bg-background text-foreground border-border flex h-screen w-screen flex-col overflow-hidden border">
