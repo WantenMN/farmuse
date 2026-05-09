@@ -53,7 +53,7 @@ export function FileExplorerItem({
         ) : null}
       </div>
       <span className="z-10 truncate tracking-tight" title={entry.name}>
-        {entry.name}
+        {entry.name.replace(/\.md$/, "")}
       </span>
     </div>
   );

@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { X, FileText } from "lucide-react";
+import { X } from "lucide-react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -47,13 +47,9 @@ export function Tabs({
                 )}
                 onClick={() => onSelect(file.path)}
               >
-                <FileText
-                  className={cn(
-                    "h-3.5 w-3.5 shrink-0",
-                    isActive ? "text-primary" : "opacity-50"
-                  )}
-                />
-                <span className="flex-1 truncate">{file.name}</span>
+                <span className="flex-1 truncate">
+                  {file.name.replace(/\.md$/, "")}
+                </span>
                 <button
                   className={cn(
                     "cursor-pointer rounded-sm p-0.5 opacity-0 transition-opacity group-hover:opacity-100",
