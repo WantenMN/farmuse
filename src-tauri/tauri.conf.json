@@ -15,7 +15,8 @@
         "title": "Farmuse",
         "width": 1200,
         "height": 800,
-        "decorations": false
+        "decorations": false,
+        "resizable": true
       }
     ],
     "security": {
