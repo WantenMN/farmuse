@@ -5,7 +5,7 @@ import { useEditor } from "../hooks/useEditor";
 import { EditorEmptyState } from "./Editor/EditorEmptyState";
 import { EditorLoadingState } from "./Editor/EditorLoadingState";
 import { EditorErrorState } from "./Editor/EditorErrorState";
-import { EditorStatusBar } from "./Editor/EditorStatusBar";
+import { EditorStatusBar, type EditorMode } from "./Editor/EditorStatusBar";
 import { getDefaultExtensions } from "./Editor/CodeMirrorConfig";
 
 interface EditorProps {
@@ -17,6 +17,7 @@ export function Editor({ path, name }: EditorProps) {
   const { content, setContent, error, loading, isSaving, lastSavedContent } =
     useEditor({ path, name });
 
+  const [mode, setMode] = React.useState<EditorMode>("live");
   const editorRef = React.useRef<HTMLDivElement>(null);
   const viewRef = React.useRef<EditorView | null>(null);
   const isInitialized = React.useRef(false);
@@ -24,7 +25,14 @@ export function Editor({ path, name }: EditorProps) {
 
   // Initialize CodeMirror
   React.useEffect(() => {
-    if (!editorRef.current || !hasContent || isInitialized.current) return;
+    if (!editorRef.current || !hasContent) return;
+
+    // Destroy existing view if path or mode changes to ensure fresh start with correct extensions
+    if (viewRef.current) {
+      viewRef.current.destroy();
+      viewRef.current = null;
+      isInitialized.current = false;
+    }
 
     const state = EditorState.create({
       doc: content || "",
@@ -36,7 +44,7 @@ export function Editor({ path, name }: EditorProps) {
             yMargin: 5 * view.defaultLineHeight,
           }),
         });
-      }),
+      }, mode),
     });
 
     const view = new EditorView({
@@ -53,7 +61,7 @@ export function Editor({ path, name }: EditorProps) {
       isInitialized.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, hasContent]);
+  }, [path, hasContent, mode]);
 
   // Sync content from state to editor
   React.useEffect(() => {
@@ -83,6 +91,8 @@ export function Editor({ path, name }: EditorProps) {
       <EditorStatusBar
         isSaving={isSaving}
         isModified={content !== lastSavedContent}
+        mode={mode}
+        onModeChange={setMode}
       />
     </div>
   );
