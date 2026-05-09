@@ -81,6 +81,9 @@ const hideDecoration = Decoration.replace({});
 const codeBlockLineDecoration = Decoration.line({
   class: "cm-code-block-line",
 });
+const blockquoteLineDecoration = Decoration.line({
+  class: "cm-blockquote-line",
+});
 
 class BulletWidget extends WidgetType {
   toDOM() {
@@ -115,7 +118,7 @@ const hrDecoration = Decoration.replace({
   widget: new HRWidget(),
 });
 
-const codeBlockPlugin = ViewPlugin.fromClass(
+const blockDecorationsPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
 
@@ -136,26 +139,41 @@ const codeBlockPlugin = ViewPlugin.fromClass(
     computeLineDecorations(view: EditorView) {
       const builder = new RangeSetBuilder<Decoration>();
       const doc = view.state.doc;
-      let lastAddedLine = -1;
+      const lines = new Map<number, { code?: boolean; quote?: boolean }>();
 
       for (const { from, to } of view.visibleRanges) {
         syntaxTree(view.state).iterate({
           from,
           to,
           enter: (node) => {
-            if (node.name === "FencedCode") {
+            if (node.name === "FencedCode" || node.name === "Blockquote") {
               const startLine = doc.lineAt(Math.max(node.from, from)).number;
               const endLine = doc.lineAt(Math.min(node.to, to)).number;
 
               for (let i = startLine; i <= endLine; i++) {
-                if (i <= lastAddedLine) continue;
-                const line = doc.line(i);
-                builder.add(line.from, line.from, codeBlockLineDecoration);
-                lastAddedLine = i;
+                let info = lines.get(i);
+                if (!info) {
+                  info = {};
+                  lines.set(i, info);
+                }
+                if (node.name === "FencedCode") info.code = true;
+                if (node.name === "Blockquote") info.quote = true;
               }
             }
           },
         });
+      }
+
+      const sortedLineNums = Array.from(lines.keys()).sort((a, b) => a - b);
+      for (const lineNum of sortedLineNums) {
+        const line = doc.line(lineNum);
+        const info = lines.get(lineNum)!;
+        if (info.code) {
+          builder.add(line.from, line.from, codeBlockLineDecoration);
+        }
+        if (info.quote) {
+          builder.add(line.from, line.from, blockquoteLineDecoration);
+        }
       }
       return builder.finish();
     }
@@ -439,6 +457,11 @@ export const getEditorTheme = (fontSize: number) =>
     ".cm-code-block-line": {
       backgroundColor: "var(--muted)",
     },
+    ".cm-blockquote-line": {
+      borderLeft: "2px solid var(--border)",
+      marginLeft: "0.5rem",
+      paddingLeft: "0.5rem !important",
+    },
     ".cm-hr": {
       display: "inline-block",
       verticalAlign: "middle",
@@ -494,7 +517,7 @@ export const getDefaultExtensions = (
       }
     }),
     getEditorTheme(fontSize),
-    codeBlockPlugin,
+    blockDecorationsPlugin,
     hoveredLineField,
     hoverPlugin,
     gutterHoverPlugin,
