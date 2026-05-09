@@ -14,14 +14,8 @@ interface EditorProps {
 }
 
 export function Editor({ path, name }: EditorProps) {
-  const {
-    content,
-    setContent,
-    error,
-    loading,
-    isSaving,
-    lastSavedContent,
-  } = useEditor({ path, name });
+  const { content, setContent, error, loading, isSaving, lastSavedContent } =
+    useEditor({ path, name });
 
   const editorRef = React.useRef<HTMLDivElement>(null);
   const viewRef = React.useRef<EditorView | null>(null);
@@ -30,12 +24,7 @@ export function Editor({ path, name }: EditorProps) {
 
   // Initialize CodeMirror
   React.useEffect(() => {
-    if (
-      !editorRef.current ||
-      !hasContent ||
-      isInitialized.current
-    )
-      return;
+    if (!editorRef.current || !hasContent || isInitialized.current) return;
 
     const state = EditorState.create({
       doc: content || "",
@@ -79,17 +68,22 @@ export function Editor({ path, name }: EditorProps) {
   }, [content]);
 
   if (!path) return <EditorEmptyState />;
-  if (loading) return <EditorLoadingState name={name} />;
-  if (error) return <EditorErrorState error={error} />;
 
   return (
-    <div className="bg-background flex min-h-0 flex-1 overflow-hidden">
-      <div className="relative h-full w-full" ref={editorRef}>
-        <EditorStatusBar
-          isSaving={isSaving}
-          isModified={content !== lastSavedContent}
-        />
+    <div className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="relative flex-1 overflow-hidden">
+        {loading ? (
+          <EditorLoadingState name={name} />
+        ) : error ? (
+          <EditorErrorState error={error} />
+        ) : (
+          <div className="h-full w-full" ref={editorRef} />
+        )}
       </div>
+      <EditorStatusBar
+        isSaving={isSaving}
+        isModified={content !== lastSavedContent}
+      />
     </div>
   );
 }
