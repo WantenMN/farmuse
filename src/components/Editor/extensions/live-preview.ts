@@ -664,7 +664,7 @@ const livePreviewStateField = StateField.define<DecorationSet>({
       mousedown: (event, _view) => {
         const target = event.target as HTMLElement;
         const link = target.closest(".cm-link");
-        if (link && event.button === 0) {
+        if (link && event.button === 0 && !event.altKey) {
           const url = link.getAttribute("data-url");
           if (url) {
             openUrl(url).catch(console.error);
