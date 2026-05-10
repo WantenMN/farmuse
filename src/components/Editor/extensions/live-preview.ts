@@ -73,42 +73,112 @@ const pointerInteractionPlugin = ViewPlugin.fromClass(
           }),
         });
 
-        const onUp = () => {
+        const onUp = (e: Event) => {
           const sel = view.state.selection.main;
           let newSel = sel;
 
-          // Essential fix: If a link is selected in preview mode, expand the selection
-          // to include hidden source markers once pointer is released.
-          if (!sel.empty) {
+          // Handle clicks on empty space around rendered content
+          // We allow a tiny tolerance (2 chars) for accidental micro-drags during click
+          const isCheckableAsClick = sel.empty || Math.abs(sel.to - sel.from) <= 2;
+
+          if (e instanceof MouseEvent && isCheckableAsClick) {
+            const pos = sel.from;
+            const line = view.state.doc.lineAt(pos);
+            try {
+              const rect = view.coordsAtPos(pos);
+              if (rect) {
+                const endRect = view.coordsAtPos(line.to);
+                if (endRect && pos < line.to) {
+                  const isAtVisualEnd =
+                    Math.abs(rect.left - endRect.left) < 1 &&
+                    Math.abs(rect.top - endRect.top) < 1;
+                  if (isAtVisualEnd && e.clientX > rect.right + 2) {
+                    newSel = EditorSelection.cursor(line.to);
+                  }
+                }
+
+                const startRect = view.coordsAtPos(line.from);
+                if (startRect && pos > line.from) {
+                  const isAtVisualStart =
+                    Math.abs(rect.left - startRect.left) < 1 &&
+                    Math.abs(rect.top - startRect.top) < 1;
+                  if (isAtVisualStart && e.clientX < rect.left - 2) {
+                    newSel = EditorSelection.cursor(line.from);
+                  }
+                }
+              }
+            } catch (err) {
+              // Ignore errors during potential rapid re-renders
+            }
+          }
+
+          // If we didn't jump to end/start, and we have a real selection, do snapping
+          if (newSel.empty && !sel.empty && !isCheckableAsClick) {
+             // Skip snap if we already decided to cursor-jump
+          } else if (!newSel.empty) {
+            // Snap selection to hidden markers for links, images, and formatting
             syntaxTree(view.state).iterate({
-              from: sel.from,
-              to: sel.to,
+              from: newSel.from,
+              to: newSel.to,
               enter: (node) => {
-                if (node.name === "Link") {
-                  const firstMark = node.node.firstChild;
-                  if (firstMark && firstMark.name === "LinkMark") {
-                    let secondMark = null;
-                    let child = firstMark.nextSibling;
-                    while (child) {
-                      if (child.name === "LinkMark") {
-                        secondMark = child;
-                        break;
-                      }
-                      child = child.nextSibling;
+                const isLinkOrImage =
+                  node.name === "Link" || node.name === "Image";
+                const isFormatting = [
+                  "Emphasis",
+                  "StrongEmphasis",
+                  "InlineCode",
+                  "Strikethrough",
+                ].includes(node.name);
+
+                if (isLinkOrImage || isFormatting) {
+                  const children = [];
+                  let c = node.node.firstChild;
+                  while (c) {
+                    children.push(c);
+                    c = c.nextSibling;
+                  }
+
+                  const firstMark = children.find((c) =>
+                    c.name.endsWith("Mark")
+                  );
+                  let snapEndMark = null;
+
+                  if (isLinkOrImage) {
+                    snapEndMark = children.find(
+                      (c) =>
+                        c.name.endsWith("Mark") &&
+                        view.state.doc.sliceString(c.from, c.to) === "]"
+                    );
+                  } else {
+                    const marks = children.filter((c) =>
+                      c.name.endsWith("Mark")
+                    );
+                    if (marks.length >= 2) snapEndMark = marks[marks.length - 1];
+                  }
+
+                  if (firstMark && snapEndMark) {
+                    let { from, to } = newSel;
+                    let changed = false;
+
+                    // If selection starts within the leading markers, snap to node start
+                    if (from >= node.from && from <= firstMark.to) {
+                      from = node.from;
+                      changed = true;
                     }
-
-                    if (secondMark) {
-                      let from = sel.from;
-                      let to = sel.to;
-                      if (from === firstMark.to) from = node.from;
-                      if (to === secondMark.from) to = node.to;
-
-                      if (from !== sel.from || to !== sel.to) {
-                        newSel = EditorSelection.range(from, to);
+                    // If selection ends within or after the trailing hidden markers, snap to node end
+                    if (to >= snapEndMark.from && to <= node.to) {
+                      // Only snap if we've actually selected some content or it's a deliberate wide selection
+                      // This prevents accidental 1px drags from highlighting the trailing stars
+                      if (from < snapEndMark.from || Math.abs(to - from) > 2) {
+                        to = node.to;
+                        changed = true;
                       }
+                    }
+                    if (changed) {
+                      newSel = EditorSelection.range(from, to);
                     }
                   }
-                  return false;
+                  if (isLinkOrImage) return false;
                 }
               },
             });
