@@ -165,11 +165,28 @@ function computeDecorations(state: EditorState) {
       if (marks.includes(node.name)) {
         const container = node.node.parent;
         if (container) {
-          // For marks within a Link, we want to hide them if the Link is not selected
+          const line = state.doc.lineAt(selection.from);
+          const isOnSameLine = node.from >= line.from && node.to <= line.to;
+
+          const formattingContainers = [
+            "Emphasis",
+            "StrongEmphasis",
+            "InlineCode",
+            "Strikethrough",
+            "Link",
+            "Image",
+            "FencedCode",
+          ];
+
+          const isInsideContainer =
+            formattingContainers.includes(container.name) &&
+            selection.from <= container.to &&
+            selection.to >= container.from;
+
           const isSelected =
-            container.name === "Link"
-              ? selection.from <= container.to && selection.to >= container.from
-              : selection.from <= node.to && selection.to >= node.from;
+            isOnSameLine ||
+            isInsideContainer ||
+            (selection.from <= node.to && selection.to >= node.from);
 
           if (node.name === "ListMark" || node.name === "TaskMarker") {
             const line = state.doc.lineAt(node.from);
