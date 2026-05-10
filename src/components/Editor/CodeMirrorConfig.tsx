@@ -65,6 +65,9 @@ export const getDefaultExtensions = (
       }
     }),
     getEditorTheme(fontSize),
+    EditorView.editorAttributes.of({
+      class: mode === "live" ? "cm-mode-live" : "cm-mode-source",
+    }),
     blockDecorationsPlugin,
     hoveredLineField,
     sourceModeImageField,

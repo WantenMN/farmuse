@@ -42,7 +42,7 @@ export const markdownHighlightStyle = HighlightStyle.define([
   { tag: t.emphasis, fontStyle: "italic" },
   { tag: t.strong, fontWeight: "bold" },
   { tag: t.link, color: "var(--primary)", textDecoration: "underline" },
-  { tag: t.url, color: "var(--muted-foreground)" },
+  { tag: t.url, color: "var(--primary)", textDecoration: "underline" },
   {
     tag: t.monospace,
     color: "var(--foreground)",
@@ -253,5 +253,15 @@ export const getEditorTheme = (fontSize: number) =>
     },
     ".cm-table-cell:focus": {
       backgroundColor: "var(--accent)",
+    },
+    ".cm-link": {
+      color: "var(--primary)",
+      textDecoration: "underline",
+    },
+    "&.cm-mode-live .cm-link": {
+      cursor: "pointer",
+    },
+    "&.cm-mode-source .cm-link": {
+      cursor: "text",
     },
   });

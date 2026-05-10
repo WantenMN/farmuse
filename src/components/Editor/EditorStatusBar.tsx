@@ -42,7 +42,7 @@ export function EditorStatusBar({
       <div className="flex items-center gap-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-[11px] font-medium transition-colors outline-none">
+            <button className="text-muted-foreground hover:text-foreground hover:bg-muted/80 flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors outline-none">
               {mode === "source" ? "Source Mode" : "Live Preview"}
               <ChevronUp className="h-3 w-3" />
             </button>

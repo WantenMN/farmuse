@@ -1,6 +1,7 @@
 import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import { RangeSetBuilder, StateField, EditorState } from "@codemirror/state";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   BulletWidget,
   HRWidget,
@@ -21,8 +22,6 @@ function computeDecorations(state: EditorState) {
   const selection = state.selection.main;
   let lastPos = -1;
 
-  // For StateField, we usually iterate over the whole document or use a smarter approach
-  // Since we want Live Preview to be responsive, we can still use the syntax tree
   syntaxTree(state).iterate({
     from: 0,
     to: state.doc.length,
@@ -46,7 +45,6 @@ function computeDecorations(state: EditorState) {
 
       if (node.name === "Image") {
         const sourceMode = state.field(sourceModeImageField);
-        // Check for overlap to be more robust than exact match
         if (
           sourceMode &&
           node.from >= sourceMode.from &&
@@ -102,9 +100,45 @@ function computeDecorations(state: EditorState) {
           selection.from <= node.to && selection.to >= node.from;
         if (!isSelected) {
           builder.add(node.from, node.to, hrDecoration);
-          lastPos = node.from;
+          lastPos = node.to;
         }
         return;
+      }
+
+      // Handle Link and Bare URL decorations (pointer cursor, click target)
+      if (
+        node.name === "Link" ||
+        (node.name === "URL" && node.node.parent?.name !== "Link")
+      ) {
+        const isSelected =
+          selection.from <= node.to && selection.to >= node.from;
+        if (!isSelected) {
+          let url = "";
+          if (node.name === "Link") {
+            const urlNode = node.node.getChild("URL");
+            if (urlNode) {
+              url = state.doc
+                .sliceString(urlNode.from, urlNode.to)
+                .replace(/^\((.*)\)$/, "$1");
+            }
+          } else {
+            url = state.doc.sliceString(node.from, node.to);
+          }
+
+          if (url) {
+            builder.add(
+              node.from,
+              node.to,
+              Decoration.mark({
+                attributes: {
+                  class: "cm-link",
+                  "data-url": url,
+                  title: url,
+                },
+              })
+            );
+          }
+        }
       }
 
       const marks = [
@@ -125,8 +159,11 @@ function computeDecorations(state: EditorState) {
       if (marks.includes(node.name)) {
         const container = node.node.parent;
         if (container) {
+          // For marks within a Link, we want to hide them if the Link is not selected
           const isSelected =
-            selection.from <= container.to && selection.to >= container.from;
+            container.name === "Link"
+              ? selection.from <= container.to && selection.to >= container.from
+              : selection.from <= node.to && selection.to >= node.from;
 
           if (node.name === "ListMark" || node.name === "TaskMarker") {
             const line = state.doc.lineAt(node.from);
@@ -143,7 +180,6 @@ function computeDecorations(state: EditorState) {
                   selection.from <= taskEnd && selection.to >= taskStart;
 
                 if (isTaskSelected) {
-                  lastPos = node.to;
                   return;
                 }
 
@@ -202,6 +238,7 @@ function computeDecorations(state: EditorState) {
                   })
                 );
               }
+              lastPos = node.to;
             } else if (node.name === "TaskMarker") {
               const text = state.doc.sliceString(node.from, node.to);
               const checked = text.includes("x") || text.includes("X");
@@ -212,10 +249,18 @@ function computeDecorations(state: EditorState) {
                   widget: new TaskWidget(checked, node.from, node.to),
                 })
               );
+              lastPos = node.to;
+            } else if (node.name === "URL") {
+              if (container.name === "Link") {
+                // Hide the URL part of a [text](url) link
+                builder.add(node.from, markTo, hideDecoration);
+                lastPos = markTo;
+              }
+              // Bare URLs are handled by the .cm-link mark above and should remain visible
             } else {
               builder.add(node.from, markTo, hideDecoration);
+              lastPos = markTo;
             }
-            lastPos = node.from;
           }
         }
       }
@@ -234,5 +279,21 @@ export const livePreviewPlugin = StateField.define<DecorationSet>({
     }
     return decorations.map(tr.changes);
   },
-  provide: (f) => EditorView.decorations.from(f),
+  provide: (f) => [
+    EditorView.decorations.from(f),
+    EditorView.domEventHandlers({
+      mousedown: (event, _view) => {
+        const target = event.target as HTMLElement;
+        const link = target.closest(".cm-link");
+        if (link && event.button === 0) {
+          const url = link.getAttribute("data-url");
+          if (url) {
+            openUrl(url).catch(console.error);
+            return true;
+          }
+        }
+        return false;
+      },
+    }),
+  ],
 });
