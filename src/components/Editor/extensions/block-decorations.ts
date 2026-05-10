@@ -6,7 +6,8 @@ import {
   ViewUpdate,
 } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
-import { RangeSetBuilder } from "@codemirror/state";
+import { RangeSetBuilder, Text } from "@codemirror/state";
+import { SyntaxNodeRef } from "@lezer/common";
 
 const codeBlockLineDecoration = Decoration.line({
   class: "cm-code-block-line",
@@ -14,6 +15,61 @@ const codeBlockLineDecoration = Decoration.line({
 const blockquoteLineDecoration = Decoration.line({
   class: "cm-blockquote-line",
 });
+
+interface LineInfo {
+  code?: boolean;
+  quote?: boolean;
+}
+
+/**
+ * Handle FencedCode line decorations
+ */
+function handleFencedCode(
+  node: SyntaxNodeRef,
+  doc: Text,
+  viewportFrom: number,
+  viewportTo: number,
+  lines: Map<number, LineInfo>
+) {
+  if (node.name !== "FencedCode") return;
+
+  const startLine = doc.lineAt(Math.max(node.from, viewportFrom)).number;
+  const endLine = doc.lineAt(Math.min(node.to, viewportTo)).number;
+
+  for (let i = startLine; i <= endLine; i++) {
+    let info = lines.get(i);
+    if (!info) {
+      info = {};
+      lines.set(i, info);
+    }
+    info.code = true;
+  }
+}
+
+/**
+ * Handle Blockquote line decorations
+ */
+function handleBlockquote(
+  node: SyntaxNodeRef,
+  doc: Text,
+  viewportFrom: number,
+  viewportTo: number,
+  lines: Map<number, LineInfo>
+) {
+  if (node.name !== "Blockquote") return;
+
+  const startLine = doc.lineAt(Math.max(node.from, viewportFrom)).number;
+  const endLine = doc.lineAt(Math.min(node.to, viewportTo)).number;
+
+  for (let i = startLine; i <= endLine; i++) {
+    let info = lines.get(i);
+    if (!info) {
+      info = {};
+      lines.set(i, info);
+    }
+    info.quote = true;
+  }
+}
 
 export const blockDecorationsPlugin = ViewPlugin.fromClass(
   class {
@@ -36,27 +92,15 @@ export const blockDecorationsPlugin = ViewPlugin.fromClass(
     computeLineDecorations(view: EditorView) {
       const builder = new RangeSetBuilder<Decoration>();
       const doc = view.state.doc;
-      const lines = new Map<number, { code?: boolean; quote?: boolean }>();
+      const lines = new Map<number, LineInfo>();
 
       for (const { from, to } of view.visibleRanges) {
         syntaxTree(view.state).iterate({
           from,
           to,
           enter: (node) => {
-            if (node.name === "FencedCode" || node.name === "Blockquote") {
-              const startLine = doc.lineAt(Math.max(node.from, from)).number;
-              const endLine = doc.lineAt(Math.min(node.to, to)).number;
-
-              for (let i = startLine; i <= endLine; i++) {
-                let info = lines.get(i);
-                if (!info) {
-                  info = {};
-                  lines.set(i, info);
-                }
-                if (node.name === "FencedCode") info.code = true;
-                if (node.name === "Blockquote") info.quote = true;
-              }
-            }
+            handleFencedCode(node, doc, from, to, lines);
+            handleBlockquote(node, doc, from, to, lines);
           },
         });
       }

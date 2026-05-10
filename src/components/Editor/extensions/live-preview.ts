@@ -5,7 +5,9 @@ import {
   RangeSetBuilder,
   StateField,
   EditorState,
+  SelectionRange,
 } from "@codemirror/state";
+import { SyntaxNodeRef } from "@lezer/common";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   BulletWidget,
@@ -22,6 +24,390 @@ const hrDecoration = Decoration.replace({
   widget: new HRWidget(),
 });
 
+/**
+ * Handle Table rendering
+ */
+function handleTable(
+  node: SyntaxNodeRef,
+  state: EditorState,
+  builder: RangeSetBuilder<Decoration>
+): number | null {
+  if (node.name !== "Table") return null;
+
+  const line = state.doc.lineAt(node.from);
+  const tableText = state.doc.sliceString(node.from, node.to);
+  builder.add(
+    line.from,
+    node.to,
+    Decoration.replace({
+      widget: new TableWidget(tableText, line.from, node.to),
+      block: true,
+    })
+  );
+  return node.to;
+}
+
+/**
+ * Handle Image rendering and source mode toggle
+ */
+function handleImage(
+  node: SyntaxNodeRef,
+  state: EditorState,
+  selection: SelectionRange,
+  builder: RangeSetBuilder<Decoration>
+): number | null {
+  if (node.name !== "Image") return null;
+
+  const sourceMode = state.field(sourceModeImageField);
+  if (sourceMode && node.from >= sourceMode.from && node.to <= sourceMode.to) {
+    return node.to;
+  }
+
+  const isSelected = selection.from <= node.to && selection.to >= node.from;
+
+  const fullText = state.doc.sliceString(node.from, node.to);
+  const match = fullText.match(/^!\[(.*?)\]\((.*?)\)$/);
+  if (!match) return null;
+
+  const alt = match[1];
+  const url = match[2];
+
+  let width: number | null = null;
+  let displayAlt = alt;
+
+  if (alt.includes("|")) {
+    const parts = alt.split("|");
+    displayAlt = parts[0];
+    const w = parseInt(parts[1].trim());
+    if (!isNaN(w)) width = w;
+  } else if (/^\d+$/.test(alt.trim())) {
+    width = parseInt(alt.trim());
+    displayAlt = "";
+  }
+
+  builder.add(
+    node.from,
+    node.to,
+    Decoration.replace({
+      widget: new ImageWidget(
+        url,
+        displayAlt,
+        width,
+        node.from,
+        node.to,
+        isSelected
+      ),
+    })
+  );
+  return node.to;
+}
+
+/**
+ * Handle Horizontal Rule rendering
+ */
+function handleHorizontalRule(
+  node: SyntaxNodeRef,
+  selection: SelectionRange,
+  builder: RangeSetBuilder<Decoration>
+): number | null {
+  if (node.name !== "HorizontalRule") return null;
+
+  const isSelected = selection.from <= node.to && selection.to >= node.from;
+  if (!isSelected) {
+    builder.add(node.from, node.to, hrDecoration);
+    return node.to;
+  }
+  return null;
+}
+
+/**
+ * Handle Link and URL decorations (mark as clickable)
+ */
+function handleLinkAndURL(
+  node: SyntaxNodeRef,
+  state: EditorState,
+  selection: SelectionRange,
+  linkBuilder: RangeSetBuilder<Decoration>
+): void {
+  if (
+    node.name === "Link" ||
+    (node.name === "URL" && node.node.parent?.name !== "Link")
+  ) {
+    const isSelected = selection.from <= node.to && selection.to >= node.from;
+    if (!isSelected) {
+      let url = "";
+      if (node.name === "Link") {
+        const urlNode = node.node.getChild("URL");
+        if (urlNode) {
+          url = state.doc
+            .sliceString(urlNode.from, urlNode.to)
+            .replace(/^\((.*)\)$/, "$1");
+        }
+      } else {
+        url = state.doc.sliceString(node.from, node.to);
+      }
+
+      if (url) {
+        linkBuilder.add(
+          node.from,
+          node.to,
+          Decoration.mark({
+            attributes: {
+              class: "cm-link",
+              "data-url": url,
+              title: url,
+            },
+          })
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Common marks handling (Header, Emphasis, List, etc.)
+ */
+function handleMarks(
+  node: SyntaxNodeRef,
+  state: EditorState,
+  selection: SelectionRange,
+  builder: RangeSetBuilder<Decoration>
+): number | null {
+  const marks = [
+    "HeaderMark",
+    "EmphasisMark",
+    "StrongEmphasisMark",
+    "ListMark",
+    "TaskMarker",
+    "QuoteMark",
+    "LinkMark",
+    "CodeMark",
+    "URL",
+    "StrikethroughMark",
+    "ImageMark",
+    "CodeInfo",
+  ];
+
+  if (!marks.includes(node.name)) return null;
+
+  const container = node.node.parent;
+  if (!container) return null;
+
+  const line = state.doc.lineAt(selection.from);
+  const isOnSameLine = node.from >= line.from && node.to <= line.to;
+
+  const formattingContainers = [
+    "Emphasis",
+    "StrongEmphasis",
+    "InlineCode",
+    "Strikethrough",
+    "Link",
+    "Image",
+    "FencedCode",
+  ];
+
+  const isInsideContainer =
+    formattingContainers.includes(container.name) &&
+    selection.from <= container.to &&
+    selection.to >= container.from;
+
+  const isSelected =
+    (isOnSameLine && container.name !== "Link") ||
+    isInsideContainer ||
+    (selection.from <= node.to && selection.to >= node.from);
+
+  // 1. Handle Headings
+  if (node.name === "HeaderMark") {
+    return handleHeader(node, state, isSelected, builder);
+  }
+
+  // 2. Handle Lists and Tasks
+  if (node.name === "ListMark" || node.name === "TaskMarker") {
+    const listResult = handleListAndTask(node, state, selection, builder);
+    if (listResult !== null) return listResult;
+
+    if (!isSelected) {
+      return handleListFallback(node, state, builder);
+    }
+  }
+
+  // 3. Handle Code marks
+  if (node.name === "CodeMark" || node.name === "CodeInfo") {
+    return handleCodeMark(node, isSelected, builder);
+  }
+
+  // 4. Handle Emphasis marks
+  if (
+    node.name === "EmphasisMark" ||
+    node.name === "StrongEmphasisMark" ||
+    node.name === "StrikethroughMark"
+  ) {
+    return handleEmphasisMark(node, isSelected, builder);
+  }
+
+  // 5. Handle Other marks (Quote, Link, etc.)
+  if (!isSelected) {
+    const markTo = node.to;
+    if (node.name === "URL") {
+      if (container.name === "Link") {
+        builder.add(node.from, markTo, hideDecoration);
+        return markTo;
+      }
+    } else {
+      builder.add(node.from, markTo, hideDecoration);
+      return markTo;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Handle Header markers
+ */
+function handleHeader(
+  node: SyntaxNodeRef,
+  state: EditorState,
+  isSelected: boolean,
+  builder: RangeSetBuilder<Decoration>
+): number | null {
+  if (!isSelected) {
+    let markTo = node.to;
+    const nextChar = state.doc.sliceString(node.to, node.to + 1);
+    if (nextChar === " ") {
+      markTo += 1;
+    }
+    builder.add(node.from, markTo, hideDecoration);
+    return markTo;
+  }
+  return null;
+}
+
+/**
+ * Fallback for ListMark if not a task list or task not handled
+ */
+function handleListFallback(
+  node: SyntaxNodeRef,
+  state: EditorState,
+  builder: RangeSetBuilder<Decoration>
+): number | null {
+  if (node.name === "ListMark") {
+    const text = state.doc.sliceString(node.from, node.to);
+    if (/[0-9]/.test(text)) {
+      builder.add(
+        node.from,
+        node.to,
+        Decoration.replace({
+          widget: new NumberWidget(text),
+        })
+      );
+    } else {
+      builder.add(
+        node.from,
+        node.to,
+        Decoration.replace({
+          widget: new BulletWidget(),
+        })
+      );
+    }
+    return node.to;
+  } else if (node.name === "TaskMarker") {
+    const text = state.doc.sliceString(node.from, node.to);
+    const checked = text.includes("x") || text.includes("X");
+    builder.add(
+      node.from,
+      node.to,
+      Decoration.replace({
+        widget: new TaskWidget(checked, node.from, node.to),
+      })
+    );
+    return node.to;
+  }
+  return null;
+}
+
+/**
+ * Handle Code markers
+ */
+function handleCodeMark(
+  node: SyntaxNodeRef,
+  isSelected: boolean,
+  builder: RangeSetBuilder<Decoration>
+): number | null {
+  if (!isSelected) {
+    builder.add(node.from, node.to, hideDecoration);
+    return node.to;
+  }
+  return null;
+}
+
+/**
+ * Handle Emphasis markers
+ */
+function handleEmphasisMark(
+  node: SyntaxNodeRef,
+  isSelected: boolean,
+  builder: RangeSetBuilder<Decoration>
+): number | null {
+  if (!isSelected) {
+    builder.add(node.from, node.to, hideDecoration);
+    return node.to;
+  }
+  return null;
+}
+
+/**
+ * Handle List markers and Task checkboxes
+ */
+function handleListAndTask(
+  node: SyntaxNodeRef,
+  state: EditorState,
+  selection: SelectionRange,
+  builder: RangeSetBuilder<Decoration>
+): number | null {
+  const line = state.doc.lineAt(node.from);
+  const lineText = line.text;
+  const isTaskList = /^[-*+]\s+\[[ xX]\]/.test(lineText.trim());
+
+  if (isTaskList) {
+    const taskMatch = lineText.match(/\[[ xX]\]/);
+    if (taskMatch) {
+      const taskStart = line.from + lineText.indexOf(taskMatch[0]);
+      const taskEnd = taskStart + taskMatch[0].length;
+
+      const isTaskSelected =
+        selection.from <= taskEnd && selection.to >= taskStart;
+
+      if (isTaskSelected) {
+        return null;
+      }
+
+      if (node.name === "ListMark") {
+        let markTo = node.to;
+        if (state.doc.sliceString(node.to, node.to + 1) === " ") {
+          markTo++;
+        }
+        builder.add(node.from, markTo, hideDecoration);
+        return markTo;
+      }
+
+      if (node.name === "TaskMarker") {
+        const text = state.doc.sliceString(node.from, node.to);
+        const checked = text.includes("x") || text.includes("X");
+        builder.add(
+          node.from,
+          node.to,
+          Decoration.replace({
+            widget: new TaskWidget(checked, node.from, node.to),
+          })
+        );
+        return node.to;
+      }
+    }
+  }
+  return null;
+}
+
 function computeDecorations(state: EditorState) {
   const builder = new RangeSetBuilder<Decoration>();
   const linkBuilder = new RangeSetBuilder<Decoration>();
@@ -34,258 +420,35 @@ function computeDecorations(state: EditorState) {
     enter: (node) => {
       if (node.from < lastPos) return;
 
-      if (node.name === "Table") {
-        const line = state.doc.lineAt(node.from);
-        const tableText = state.doc.sliceString(node.from, node.to);
-        builder.add(
-          line.from,
-          node.to,
-          Decoration.replace({
-            widget: new TableWidget(tableText, line.from, node.to),
-            block: true,
-          })
-        );
-        lastPos = node.to;
+      // Try Table
+      const tablePos = handleTable(node, state, builder);
+      if (tablePos !== null) {
+        lastPos = tablePos;
         return;
       }
 
-      if (node.name === "Image") {
-        const sourceMode = state.field(sourceModeImageField);
-        if (
-          sourceMode &&
-          node.from >= sourceMode.from &&
-          node.to <= sourceMode.to
-        ) {
-          lastPos = node.to;
-          return;
-        }
-
-        const isSelected =
-          selection.from <= node.to && selection.to >= node.from;
-
-        const fullText = state.doc.sliceString(node.from, node.to);
-        const match = fullText.match(/^!\[(.*?)\]\((.*?)\)$/);
-        if (!match) return;
-
-        const alt = match[1];
-        const url = match[2];
-
-        let width: number | null = null;
-        let displayAlt = alt;
-
-        if (alt.includes("|")) {
-          const parts = alt.split("|");
-          displayAlt = parts[0];
-          const w = parseInt(parts[1].trim());
-          if (!isNaN(w)) width = w;
-        } else if (/^\d+$/.test(alt.trim())) {
-          width = parseInt(alt.trim());
-          displayAlt = "";
-        }
-
-        builder.add(
-          node.from,
-          node.to,
-          Decoration.replace({
-            widget: new ImageWidget(
-              url,
-              displayAlt,
-              width,
-              node.from,
-              node.to,
-              isSelected
-            ),
-          })
-        );
-        lastPos = node.to;
+      // Try Image
+      const imagePos = handleImage(node, state, selection, builder);
+      if (imagePos !== null) {
+        lastPos = imagePos;
         return;
       }
 
-      if (node.name === "HorizontalRule") {
-        const isSelected =
-          selection.from <= node.to && selection.to >= node.from;
-        if (!isSelected) {
-          builder.add(node.from, node.to, hrDecoration);
-          lastPos = node.to;
-        }
+      // Try Horizontal Rule
+      const hrPos = handleHorizontalRule(node, selection, builder);
+      if (hrPos !== null) {
+        lastPos = hrPos;
         return;
       }
 
-      // Handle Link and Bare URL decorations (pointer cursor, click target)
-      if (
-        node.name === "Link" ||
-        (node.name === "URL" && node.node.parent?.name !== "Link")
-      ) {
-        const isSelected =
-          selection.from <= node.to && selection.to >= node.from;
-        if (!isSelected) {
-          let url = "";
-          if (node.name === "Link") {
-            const urlNode = node.node.getChild("URL");
-            if (urlNode) {
-              url = state.doc
-                .sliceString(urlNode.from, urlNode.to)
-                .replace(/^\((.*)\)$/, "$1");
-            }
-          } else {
-            url = state.doc.sliceString(node.from, node.to);
-          }
+      // Handle Link/URL marks
+      handleLinkAndURL(node, state, selection, linkBuilder);
 
-          if (url) {
-            linkBuilder.add(
-              node.from,
-              node.to,
-              Decoration.mark({
-                attributes: {
-                  class: "cm-link",
-                  "data-url": url,
-                  title: url,
-                },
-              })
-            );
-          }
-        }
-      }
-
-      const marks = [
-        "HeaderMark",
-        "EmphasisMark",
-        "StrongEmphasisMark",
-        "ListMark",
-        "TaskMarker",
-        "QuoteMark",
-        "LinkMark",
-        "CodeMark",
-        "URL",
-        "StrikethroughMark",
-        "ImageMark",
-        "CodeInfo",
-      ];
-
-      if (marks.includes(node.name)) {
-        const container = node.node.parent;
-        if (container) {
-          const line = state.doc.lineAt(selection.from);
-          const isOnSameLine = node.from >= line.from && node.to <= line.to;
-
-          const formattingContainers = [
-            "Emphasis",
-            "StrongEmphasis",
-            "InlineCode",
-            "Strikethrough",
-            "Link",
-            "Image",
-            "FencedCode",
-          ];
-
-          const isInsideContainer =
-            formattingContainers.includes(container.name) &&
-            selection.from <= container.to &&
-            selection.to >= container.from;
-
-          const isSelected =
-            (isOnSameLine && container.name !== "Link") ||
-            isInsideContainer ||
-            (selection.from <= node.to && selection.to >= node.from);
-
-          if (node.name === "ListMark" || node.name === "TaskMarker") {
-            const line = state.doc.lineAt(node.from);
-            const lineText = line.text;
-            const isTaskList = /^[-*+]\s+\[[ xX]\]/.test(lineText.trim());
-
-            if (isTaskList) {
-              const taskMatch = lineText.match(/\[[ xX]\]/);
-              if (taskMatch) {
-                const taskStart = line.from + lineText.indexOf(taskMatch[0]);
-                const taskEnd = taskStart + taskMatch[0].length;
-
-                const isTaskSelected =
-                  selection.from <= taskEnd && selection.to >= taskStart;
-
-                if (isTaskSelected) {
-                  return;
-                }
-
-                if (node.name === "ListMark") {
-                  let markTo = node.to;
-                  if (state.doc.sliceString(node.to, node.to + 1) === " ") {
-                    markTo++;
-                  }
-                  builder.add(node.from, markTo, hideDecoration);
-                  lastPos = markTo;
-                  return;
-                }
-
-                if (node.name === "TaskMarker") {
-                  const text = state.doc.sliceString(node.from, node.to);
-                  const checked = text.includes("x") || text.includes("X");
-                  builder.add(
-                    node.from,
-                    node.to,
-                    Decoration.replace({
-                      widget: new TaskWidget(checked, node.from, node.to),
-                    })
-                  );
-                  lastPos = node.to;
-                  return;
-                }
-              }
-            }
-          }
-
-          if (!isSelected) {
-            let markTo = node.to;
-            if (node.name === "HeaderMark") {
-              const nextChar = state.doc.sliceString(node.to, node.to + 1);
-              if (nextChar === " ") {
-                markTo += 1;
-              }
-            }
-
-            if (node.name === "ListMark") {
-              const text = state.doc.sliceString(node.from, node.to);
-              if (/[0-9]/.test(text)) {
-                builder.add(
-                  node.from,
-                  node.to,
-                  Decoration.replace({
-                    widget: new NumberWidget(text),
-                  })
-                );
-              } else {
-                builder.add(
-                  node.from,
-                  node.to,
-                  Decoration.replace({
-                    widget: new BulletWidget(),
-                  })
-                );
-              }
-              lastPos = node.to;
-            } else if (node.name === "TaskMarker") {
-              const text = state.doc.sliceString(node.from, node.to);
-              const checked = text.includes("x") || text.includes("X");
-              builder.add(
-                node.from,
-                node.to,
-                Decoration.replace({
-                  widget: new TaskWidget(checked, node.from, node.to),
-                })
-              );
-              lastPos = node.to;
-            } else if (node.name === "URL") {
-              if (container.name === "Link") {
-                // Hide the URL part of a [text](url) link
-                builder.add(node.from, markTo, hideDecoration);
-                lastPos = markTo;
-              }
-              // Bare URLs are handled by the .cm-link mark above and should remain visible
-            } else {
-              builder.add(node.from, markTo, hideDecoration);
-              lastPos = markTo;
-            }
-          }
-        }
+      // Handle common marks (Header, List, etc.)
+      const markPos = handleMarks(node, state, selection, builder);
+      if (markPos !== null) {
+        lastPos = markPos;
+        return;
       }
     },
   });
