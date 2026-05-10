@@ -184,7 +184,7 @@ function computeDecorations(state: EditorState) {
             selection.to >= container.from;
 
           const isSelected =
-            isOnSameLine ||
+            (isOnSameLine && container.name !== "Link") ||
             isInsideContainer ||
             (selection.from <= node.to && selection.to >= node.from);
 
