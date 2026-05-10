@@ -1,6 +1,11 @@
 import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
-import { RangeSetBuilder, StateField, EditorState } from "@codemirror/state";
+import {
+  RangeSet,
+  RangeSetBuilder,
+  StateField,
+  EditorState,
+} from "@codemirror/state";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   BulletWidget,
@@ -19,6 +24,7 @@ const hrDecoration = Decoration.replace({
 
 function computeDecorations(state: EditorState) {
   const builder = new RangeSetBuilder<Decoration>();
+  const linkBuilder = new RangeSetBuilder<Decoration>();
   const selection = state.selection.main;
   let lastPos = -1;
 
@@ -126,7 +132,7 @@ function computeDecorations(state: EditorState) {
           }
 
           if (url) {
-            builder.add(
+            linkBuilder.add(
               node.from,
               node.to,
               Decoration.mark({
@@ -266,7 +272,7 @@ function computeDecorations(state: EditorState) {
       }
     },
   });
-  return builder.finish();
+  return RangeSet.join([builder.finish(), linkBuilder.finish()]);
 }
 
 export const livePreviewPlugin = StateField.define<DecorationSet>({
