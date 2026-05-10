@@ -39,14 +39,8 @@ export function Editor({ path, name }: EditorProps) {
     const state = EditorState.create({
       doc: content || "",
       extensions: getDefaultExtensions(
-        (newContent, view) => {
+        (newContent) => {
           setContent(newContent);
-          view.dispatch({
-            effects: EditorView.scrollIntoView(view.state.selection.main, {
-              y: "nearest",
-              yMargin: 5 * view.defaultLineHeight,
-            }),
-          });
         },
         mode,
         fontSize

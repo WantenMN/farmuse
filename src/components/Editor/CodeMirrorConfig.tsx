@@ -26,6 +26,7 @@ import { tags as t } from "@lezer/highlight";
 import { history, defaultKeymap, historyKeymap } from "@codemirror/commands";
 import { closeBrackets } from "@codemirror/autocomplete";
 import { markdown } from "@codemirror/lang-markdown";
+import { GFM } from "@lezer/markdown";
 import { RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 
 export const markdownHighlightStyle = HighlightStyle.define([
@@ -111,6 +112,43 @@ class HRWidget extends WidgetType {
     const hr = document.createElement("span");
     hr.className = "cm-hr";
     return hr;
+  }
+}
+
+class TaskWidget extends WidgetType {
+  constructor(
+    readonly checked: boolean,
+    readonly from: number,
+    readonly to: number
+  ) {
+    super();
+  }
+
+  eq(other: TaskWidget) {
+    return (
+      other.checked === this.checked &&
+      other.from === this.from &&
+      other.to === this.to
+    );
+  }
+
+  toDOM(view: EditorView) {
+    const span = document.createElement("span");
+    span.className = "cm-task-checkbox";
+    if (this.checked) {
+      span.classList.add("cm-task-checkbox-checked");
+    }
+
+    span.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const newText = this.checked ? "[ ]" : "[x]";
+      view.dispatch({
+        changes: { from: this.from, to: this.to, insert: newText },
+      });
+    };
+
+    return span;
   }
 }
 
@@ -566,6 +604,7 @@ const livePreviewPlugin = ViewPlugin.fromClass(
               "EmphasisMark",
               "StrongEmphasisMark",
               "ListMark",
+              "TaskMarker",
               "QuoteMark",
               "LinkMark",
               "CodeMark",
@@ -581,6 +620,60 @@ const livePreviewPlugin = ViewPlugin.fromClass(
                 const isSelected =
                   selection.from <= container.to &&
                   selection.to >= container.from;
+
+                if (node.name === "ListMark" || node.name === "TaskMarker") {
+                  const line = view.state.doc.lineAt(node.from);
+                  const lineText = line.text;
+                  const isTaskList = /^[-*+]\s+\[[ xX]\]/.test(lineText.trim());
+
+                  if (isTaskList) {
+                    const taskMatch = lineText.match(/\[[ xX]\]/);
+                    if (taskMatch) {
+                      const taskStart =
+                        line.from + lineText.indexOf(taskMatch[0]);
+                      const taskEnd = taskStart + taskMatch[0].length;
+
+                      const isTaskSelected =
+                        selection.from <= taskEnd && selection.to >= taskStart;
+
+                      if (isTaskSelected) {
+                        lastPos = node.to;
+                        return;
+                      }
+
+                      if (node.name === "ListMark") {
+                        let markTo = node.to;
+                        if (
+                          view.state.doc.sliceString(node.to, node.to + 1) ===
+                          " "
+                        ) {
+                          markTo++;
+                        }
+                        builder.add(node.from, markTo, hideDecoration);
+                        lastPos = markTo;
+                        return;
+                      }
+
+                      if (node.name === "TaskMarker") {
+                        const text = view.state.doc.sliceString(
+                          node.from,
+                          node.to
+                        );
+                        const checked =
+                          text.includes("x") || text.includes("X");
+                        builder.add(
+                          node.from,
+                          node.to,
+                          Decoration.replace({
+                            widget: new TaskWidget(checked, node.from, node.to),
+                          })
+                        );
+                        lastPos = node.to;
+                        return;
+                      }
+                    }
+                  }
+                }
 
                 if (!isSelected) {
                   let markTo = node.to;
@@ -613,6 +706,16 @@ const livePreviewPlugin = ViewPlugin.fromClass(
                         })
                       );
                     }
+                  } else if (node.name === "TaskMarker") {
+                    const text = view.state.doc.sliceString(node.from, node.to);
+                    const checked = text.includes("x") || text.includes("X");
+                    builder.add(
+                      node.from,
+                      node.to,
+                      Decoration.replace({
+                        widget: new TaskWidget(checked, node.from, node.to),
+                      })
+                    );
                   } else {
                     builder.add(node.from, markTo, hideDecoration);
                   }
@@ -764,6 +867,44 @@ export const getEditorTheme = (fontSize: number) =>
       pointerEvents: "auto",
       zIndex: "10",
     },
+    ".cm-task-checkbox": {
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: "1.1rem",
+      height: "1.1rem",
+      border: "1.5px solid var(--muted-foreground)",
+      borderRadius: "4px",
+      marginRight: "0.5rem",
+      cursor: "pointer",
+      verticalAlign: "middle",
+      backgroundColor: "var(--muted)",
+      position: "relative",
+      top: "-1.5px",
+      transition:
+        "border-color 0.1s ease-in-out, background-color 0.1s ease-in-out",
+    },
+    ".cm-task-checkbox:hover": {
+      borderColor: "#3b82f6",
+    },
+    ".cm-task-checkbox-checked": {
+      backgroundColor: "#3b82f6 !important",
+      borderColor: "#3b82f6 !important",
+    },
+    ".cm-task-checkbox-checked:hover": {
+      backgroundColor: "#2563eb !important",
+      borderColor: "#2563eb !important",
+    },
+    ".cm-task-checkbox-checked::after": {
+      content: '""',
+      position: "absolute",
+      width: "0.3rem",
+      height: "0.6rem",
+      border: "solid white",
+      borderWidth: "0 2px 2px 0",
+      transform: "rotate(45deg)",
+      top: "1px",
+    },
   });
 
 export const getDefaultExtensions = (
@@ -796,7 +937,7 @@ export const getDefaultExtensions = (
     closeBrackets(),
     highlightActiveLine(),
     keymap.of([...defaultKeymap, ...historyKeymap]),
-    markdown(),
+    markdown({ extensions: [GFM] }),
     EditorView.lineWrapping,
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
