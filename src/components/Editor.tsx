@@ -1,7 +1,6 @@
 import * as React from "react";
-import { EditorView } from "@codemirror/view";
-import { EditorState } from "@codemirror/state";
 import { useEditor } from "../hooks/useEditor";
+import { useCodeMirror } from "../hooks/useCodeMirror";
 import { useSettingsStore } from "../store/settingsStore";
 import { EditorEmptyState } from "./Editor/EditorEmptyState";
 import { EditorLoadingState } from "./Editor/EditorLoadingState";
@@ -21,59 +20,24 @@ export function Editor({ path, name }: EditorProps) {
 
   const [mode, setMode] = React.useState<EditorMode>("live");
   const editorRef = React.useRef<HTMLDivElement>(null);
-  const viewRef = React.useRef<EditorView | null>(null);
-  const isInitialized = React.useRef(false);
+
   const hasContent = content !== null;
+  const extensions = React.useMemo(() => {
+    if (!hasContent) return [];
+    return getDefaultExtensions(
+      (newContent) => {
+        setContent(newContent);
+      },
+      mode,
+      fontSize
+    );
+  }, [setContent, mode, fontSize, hasContent]);
 
-  // Initialize CodeMirror
-  React.useEffect(() => {
-    if (!editorRef.current || !hasContent) return;
-
-    // Destroy existing view if path or mode changes to ensure fresh start with correct extensions
-    if (viewRef.current) {
-      viewRef.current.destroy();
-      viewRef.current = null;
-      isInitialized.current = false;
-    }
-
-    const state = EditorState.create({
-      doc: content || "",
-      extensions: getDefaultExtensions(
-        (newContent) => {
-          setContent(newContent);
-        },
-        mode,
-        fontSize
-      ),
-    });
-
-    const view = new EditorView({
-      state,
-      parent: editorRef.current,
-    });
-
-    viewRef.current = view;
-    isInitialized.current = true;
-
-    return () => {
-      view.destroy();
-      viewRef.current = null;
-      isInitialized.current = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, hasContent, mode, fontSize]);
-
-  // Sync content from state to editor
-  React.useEffect(() => {
-    if (viewRef.current && content !== null) {
-      const currentDoc = viewRef.current.state.doc.toString();
-      if (content !== currentDoc) {
-        viewRef.current.dispatch({
-          changes: { from: 0, to: currentDoc.length, insert: content },
-        });
-      }
-    }
-  }, [content]);
+  useCodeMirror({
+    container: editorRef,
+    value: content || "",
+    extensions,
+  });
 
   if (!path) return <EditorEmptyState />;
 
