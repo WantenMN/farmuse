@@ -242,3 +242,108 @@ export class ImageWidget extends WidgetType {
     });
   }
 }
+
+export class TableWidget extends WidgetType {
+  constructor(
+    readonly content: string,
+    readonly from: number,
+    readonly to: number
+  ) {
+    super();
+  }
+
+  get estimatedHeight() {
+    const lines = this.content.split("\n").length;
+    return Math.max(lines * 35, 40);
+  }
+
+  eq(other: TableWidget) {
+    return (
+      other.content === this.content &&
+      other.from === this.from &&
+      other.to === this.to
+    );
+  }
+
+  toDOM(view: EditorView) {
+    const container = document.createElement("div");
+    container.className = "cm-table-container";
+
+    const lines = this.content.split("\n");
+    const table = document.createElement("table");
+    table.className = "cm-table";
+
+    let delimiterLine = "";
+    const data: string[][] = [];
+
+    lines.forEach((line) => {
+      let cells = line.trim().split("|");
+      if (cells[0] === "") cells.shift();
+      if (cells[cells.length - 1] === "") cells.pop();
+      cells = cells.map((c) => c.trim());
+
+      if (cells.length > 0 && cells.every((c) => /^[ :-]+$/.test(c))) {
+        delimiterLine = line;
+      } else if (line.trim()) {
+        data.push(cells);
+      }
+    });
+
+    if (data.length === 0) {
+      container.textContent = this.content;
+      return container;
+    }
+
+    data.forEach((row, rowIndex) => {
+      const tr = document.createElement("tr");
+      row.forEach((cell, colIndex) => {
+        const el = document.createElement(rowIndex === 0 ? "th" : "td");
+        el.contentEditable = "true";
+        el.textContent = cell;
+        el.className = "cm-table-cell";
+
+        el.onblur = () => {
+          const newText = el.textContent || "";
+          if (newText !== cell) {
+            const newData = data.map((r) => [...r].map((c) => c || " "));
+            newData[rowIndex][colIndex] = newText;
+            this.updateTable(view, newData, delimiterLine);
+          }
+        };
+
+        el.onkeydown = (e) => {
+          if (e.key === "Enter") {
+            if (!e.shiftKey) {
+              e.preventDefault();
+              el.blur();
+            }
+          }
+          e.stopPropagation();
+        };
+
+        tr.appendChild(el);
+      });
+      table.appendChild(tr);
+    });
+
+    container.appendChild(table);
+    return container;
+  }
+
+  updateTable(view: EditorView, data: string[][], delimiterLine: string) {
+    const header = data[0];
+    const body = data.slice(1);
+
+    let newContent = `| ${header.join(" | ")} |\n`;
+    newContent += delimiterLine
+      ? delimiterLine + "\n"
+      : `| ${header.map(() => "---").join(" | ")} |\n`;
+    body.forEach((row) => {
+      newContent += `| ${row.join(" | ")} |\n`;
+    });
+
+    view.dispatch({
+      changes: { from: this.from, to: this.to, insert: newContent.trim() },
+    });
+  }
+}

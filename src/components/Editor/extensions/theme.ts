@@ -222,4 +222,36 @@ export const getEditorTheme = (fontSize: number) =>
       transform: "rotate(45deg)",
       top: "1px",
     },
+    ".cm-table-container": {
+      display: "block",
+      margin: "0",
+      width: "100%",
+      overflowX: "auto",
+    },
+    ".cm-table": {
+      borderCollapse: "collapse",
+      width: "100%",
+      fontSize: "0.875rem",
+      border: "1px solid var(--border)",
+    },
+    ".cm-table th": {
+      backgroundColor: "var(--muted)",
+      fontWeight: "600",
+      textAlign: "left",
+      height: "1.75rem",
+      padding: "0 0.5rem",
+      border: "1px solid var(--border)",
+      verticalAlign: "middle",
+    },
+    ".cm-table td": {
+      border: "1px solid var(--border)",
+      padding: "0.5rem",
+      minWidth: "100px",
+    },
+    ".cm-table-cell": {
+      outline: "none",
+    },
+    ".cm-table-cell:focus": {
+      backgroundColor: "var(--accent)",
+    },
   });

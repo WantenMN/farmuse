@@ -3,24 +3,27 @@ import { setHoveredLine, hoveredLineField } from "./state";
 
 export const hoverPlugin = EditorView.domEventHandlers({
   mousemove(event, view) {
+    if (!view.contentDOM) return;
     const rect = view.contentDOM.getBoundingClientRect();
+    if (!rect) return;
+
     // Check vertical position relative to the center of the content to be more robust
     const x = rect.left + rect.width / 2;
-    const pos = view.posAtCoords({ x, y: event.clientY });
+    try {
+      const pos = view.posAtCoords({ x, y: event.clientY });
 
-    if (pos !== null) {
-      try {
+      if (pos !== null) {
         const line = view.state.doc.lineAt(pos).number;
         if (view.state.field(hoveredLineField) !== line) {
           view.dispatch({ effects: setHoveredLine.of(line) });
         }
-      } catch {
-        // Position might be out of bounds
+      } else {
+        if (view.state.field(hoveredLineField) !== null) {
+          view.dispatch({ effects: setHoveredLine.of(null) });
+        }
       }
-    } else {
-      if (view.state.field(hoveredLineField) !== null) {
-        view.dispatch({ effects: setHoveredLine.of(null) });
-      }
+    } catch {
+      // Position might be out of bounds or view might be in inconsistent state
     }
   },
   mouseleave(_event, view) {

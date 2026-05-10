@@ -1,17 +1,12 @@
-import {
-  Decoration,
-  DecorationSet,
-  EditorView,
-  ViewPlugin,
-  ViewUpdate,
-} from "@codemirror/view";
+import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
-import { RangeSetBuilder } from "@codemirror/state";
+import { RangeSetBuilder, StateField, EditorState } from "@codemirror/state";
 import {
   BulletWidget,
   HRWidget,
   ImageWidget,
   NumberWidget,
+  TableWidget,
   TaskWidget,
 } from "./widgets";
 import { sourceModeImageField } from "./state";
@@ -21,231 +16,223 @@ const hrDecoration = Decoration.replace({
   widget: new HRWidget(),
 });
 
-export const livePreviewPlugin = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
+function computeDecorations(state: EditorState) {
+  const builder = new RangeSetBuilder<Decoration>();
+  const selection = state.selection.main;
+  let lastPos = -1;
 
-    constructor(view: EditorView) {
-      this.decorations = this.computeDecorations(view);
-    }
+  // For StateField, we usually iterate over the whole document or use a smarter approach
+  // Since we want Live Preview to be responsive, we can still use the syntax tree
+  syntaxTree(state).iterate({
+    from: 0,
+    to: state.doc.length,
+    enter: (node) => {
+      if (node.from < lastPos) return;
 
-    update(update: ViewUpdate) {
-      if (
-        update.docChanged ||
-        update.selectionSet ||
-        update.viewportChanged ||
-        update.geometryChanged
-      ) {
-        this.decorations = this.computeDecorations(update.view);
+      if (node.name === "Table") {
+        const line = state.doc.lineAt(node.from);
+        const tableText = state.doc.sliceString(node.from, node.to);
+        builder.add(
+          line.from,
+          node.to,
+          Decoration.replace({
+            widget: new TableWidget(tableText, line.from, node.to),
+            block: true,
+          })
+        );
+        lastPos = node.to;
+        return;
       }
-    }
 
-    computeDecorations(view: EditorView) {
-      const builder = new RangeSetBuilder<Decoration>();
-      const selection = view.state.selection.main;
-      let lastPos = -1;
+      if (node.name === "Image") {
+        const sourceMode = state.field(sourceModeImageField);
+        // Check for overlap to be more robust than exact match
+        if (
+          sourceMode &&
+          node.from >= sourceMode.from &&
+          node.to <= sourceMode.to
+        ) {
+          lastPos = node.to;
+          return;
+        }
 
-      for (const { from, to } of view.visibleRanges) {
-        syntaxTree(view.state).iterate({
-          from,
-          to,
-          enter: (node) => {
-            if (node.from < from || node.from < lastPos) return;
+        const isSelected =
+          selection.from <= node.to && selection.to >= node.from;
 
-            if (node.name === "Image") {
-              const sourceMode = view.state.field(sourceModeImageField);
-              // Check for overlap to be more robust than exact match
-              if (
-                sourceMode &&
-                node.from >= sourceMode.from &&
-                node.to <= sourceMode.to
-              ) {
-                lastPos = node.to;
-                return;
+        const fullText = state.doc.sliceString(node.from, node.to);
+        const match = fullText.match(/^!\[(.*?)\]\((.*?)\)$/);
+        if (!match) return;
+
+        const alt = match[1];
+        const url = match[2];
+
+        let width: number | null = null;
+        let displayAlt = alt;
+
+        if (alt.includes("|")) {
+          const parts = alt.split("|");
+          displayAlt = parts[0];
+          const w = parseInt(parts[1].trim());
+          if (!isNaN(w)) width = w;
+        } else if (/^\d+$/.test(alt.trim())) {
+          width = parseInt(alt.trim());
+          displayAlt = "";
+        }
+
+        builder.add(
+          node.from,
+          node.to,
+          Decoration.replace({
+            widget: new ImageWidget(
+              url,
+              displayAlt,
+              width,
+              node.from,
+              node.to,
+              isSelected
+            ),
+          })
+        );
+        lastPos = node.to;
+        return;
+      }
+
+      if (node.name === "HorizontalRule") {
+        const isSelected =
+          selection.from <= node.to && selection.to >= node.from;
+        if (!isSelected) {
+          builder.add(node.from, node.to, hrDecoration);
+          lastPos = node.from;
+        }
+        return;
+      }
+
+      const marks = [
+        "HeaderMark",
+        "EmphasisMark",
+        "StrongEmphasisMark",
+        "ListMark",
+        "TaskMarker",
+        "QuoteMark",
+        "LinkMark",
+        "CodeMark",
+        "URL",
+        "StrikethroughMark",
+        "ImageMark",
+        "CodeInfo",
+      ];
+
+      if (marks.includes(node.name)) {
+        const container = node.node.parent;
+        if (container) {
+          const isSelected =
+            selection.from <= container.to && selection.to >= container.from;
+
+          if (node.name === "ListMark" || node.name === "TaskMarker") {
+            const line = state.doc.lineAt(node.from);
+            const lineText = line.text;
+            const isTaskList = /^[-*+]\s+\[[ xX]\]/.test(lineText.trim());
+
+            if (isTaskList) {
+              const taskMatch = lineText.match(/\[[ xX]\]/);
+              if (taskMatch) {
+                const taskStart = line.from + lineText.indexOf(taskMatch[0]);
+                const taskEnd = taskStart + taskMatch[0].length;
+
+                const isTaskSelected =
+                  selection.from <= taskEnd && selection.to >= taskStart;
+
+                if (isTaskSelected) {
+                  lastPos = node.to;
+                  return;
+                }
+
+                if (node.name === "ListMark") {
+                  let markTo = node.to;
+                  if (state.doc.sliceString(node.to, node.to + 1) === " ") {
+                    markTo++;
+                  }
+                  builder.add(node.from, markTo, hideDecoration);
+                  lastPos = markTo;
+                  return;
+                }
+
+                if (node.name === "TaskMarker") {
+                  const text = state.doc.sliceString(node.from, node.to);
+                  const checked = text.includes("x") || text.includes("X");
+                  builder.add(
+                    node.from,
+                    node.to,
+                    Decoration.replace({
+                      widget: new TaskWidget(checked, node.from, node.to),
+                    })
+                  );
+                  lastPos = node.to;
+                  return;
+                }
               }
+            }
+          }
 
-              const isSelected =
-                selection.from <= node.to && selection.to >= node.from;
-
-              const fullText = view.state.doc.sliceString(node.from, node.to);
-              const match = fullText.match(/^!\[(.*?)\]\((.*?)\)$/);
-              if (!match) return;
-
-              const alt = match[1];
-              const url = match[2];
-
-              let width: number | null = null;
-              let displayAlt = alt;
-
-              if (alt.includes("|")) {
-                const parts = alt.split("|");
-                displayAlt = parts[0];
-                const w = parseInt(parts[1].trim());
-                if (!isNaN(w)) width = w;
-              } else if (/^\d+$/.test(alt.trim())) {
-                width = parseInt(alt.trim());
-                displayAlt = "";
+          if (!isSelected) {
+            let markTo = node.to;
+            if (node.name === "HeaderMark") {
+              const nextChar = state.doc.sliceString(node.to, node.to + 1);
+              if (nextChar === " ") {
+                markTo += 1;
               }
+            }
 
+            if (node.name === "ListMark") {
+              const text = state.doc.sliceString(node.from, node.to);
+              if (/[0-9]/.test(text)) {
+                builder.add(
+                  node.from,
+                  node.to,
+                  Decoration.replace({
+                    widget: new NumberWidget(text),
+                  })
+                );
+              } else {
+                builder.add(
+                  node.from,
+                  node.to,
+                  Decoration.replace({
+                    widget: new BulletWidget(),
+                  })
+                );
+              }
+            } else if (node.name === "TaskMarker") {
+              const text = state.doc.sliceString(node.from, node.to);
+              const checked = text.includes("x") || text.includes("X");
               builder.add(
                 node.from,
                 node.to,
                 Decoration.replace({
-                  widget: new ImageWidget(
-                    url,
-                    displayAlt,
-                    width,
-                    node.from,
-                    node.to,
-                    isSelected
-                  ),
+                  widget: new TaskWidget(checked, node.from, node.to),
                 })
               );
-              lastPos = node.to;
-              return;
+            } else {
+              builder.add(node.from, markTo, hideDecoration);
             }
-
-            if (node.name === "HorizontalRule") {
-              const isSelected =
-                selection.from <= node.to && selection.to >= node.from;
-              if (!isSelected) {
-                builder.add(node.from, node.to, hrDecoration);
-                lastPos = node.from;
-              }
-              return;
-            }
-
-            const marks = [
-              "HeaderMark",
-              "EmphasisMark",
-              "StrongEmphasisMark",
-              "ListMark",
-              "TaskMarker",
-              "QuoteMark",
-              "LinkMark",
-              "CodeMark",
-              "URL",
-              "StrikethroughMark",
-              "ImageMark",
-              "CodeInfo",
-            ];
-
-            if (marks.includes(node.name)) {
-              const container = node.node.parent;
-              if (container) {
-                const isSelected =
-                  selection.from <= container.to &&
-                  selection.to >= container.from;
-
-                if (node.name === "ListMark" || node.name === "TaskMarker") {
-                  const line = view.state.doc.lineAt(node.from);
-                  const lineText = line.text;
-                  const isTaskList = /^[-*+]\s+\[[ xX]\]/.test(lineText.trim());
-
-                  if (isTaskList) {
-                    const taskMatch = lineText.match(/\[[ xX]\]/);
-                    if (taskMatch) {
-                      const taskStart =
-                        line.from + lineText.indexOf(taskMatch[0]);
-                      const taskEnd = taskStart + taskMatch[0].length;
-
-                      const isTaskSelected =
-                        selection.from <= taskEnd && selection.to >= taskStart;
-
-                      if (isTaskSelected) {
-                        lastPos = node.to;
-                        return;
-                      }
-
-                      if (node.name === "ListMark") {
-                        let markTo = node.to;
-                        if (
-                          view.state.doc.sliceString(node.to, node.to + 1) ===
-                          " "
-                        ) {
-                          markTo++;
-                        }
-                        builder.add(node.from, markTo, hideDecoration);
-                        lastPos = markTo;
-                        return;
-                      }
-
-                      if (node.name === "TaskMarker") {
-                        const text = view.state.doc.sliceString(
-                          node.from,
-                          node.to
-                        );
-                        const checked =
-                          text.includes("x") || text.includes("X");
-                        builder.add(
-                          node.from,
-                          node.to,
-                          Decoration.replace({
-                            widget: new TaskWidget(checked, node.from, node.to),
-                          })
-                        );
-                        lastPos = node.to;
-                        return;
-                      }
-                    }
-                  }
-                }
-
-                if (!isSelected) {
-                  let markTo = node.to;
-                  if (node.name === "HeaderMark") {
-                    const nextChar = view.state.doc.sliceString(
-                      node.to,
-                      node.to + 1
-                    );
-                    if (nextChar === " ") {
-                      markTo += 1;
-                    }
-                  }
-
-                  if (node.name === "ListMark") {
-                    const text = view.state.doc.sliceString(node.from, node.to);
-                    if (/[0-9]/.test(text)) {
-                      builder.add(
-                        node.from,
-                        node.to,
-                        Decoration.replace({
-                          widget: new NumberWidget(text),
-                        })
-                      );
-                    } else {
-                      builder.add(
-                        node.from,
-                        node.to,
-                        Decoration.replace({
-                          widget: new BulletWidget(),
-                        })
-                      );
-                    }
-                  } else if (node.name === "TaskMarker") {
-                    const text = view.state.doc.sliceString(node.from, node.to);
-                    const checked = text.includes("x") || text.includes("X");
-                    builder.add(
-                      node.from,
-                      node.to,
-                      Decoration.replace({
-                        widget: new TaskWidget(checked, node.from, node.to),
-                      })
-                    );
-                  } else {
-                    builder.add(node.from, markTo, hideDecoration);
-                  }
-                  lastPos = node.from;
-                }
-              }
-            }
-          },
-        });
+            lastPos = node.from;
+          }
+        }
       }
-      return builder.finish();
-    }
+    },
+  });
+  return builder.finish();
+}
+
+export const livePreviewPlugin = StateField.define<DecorationSet>({
+  create(state) {
+    return computeDecorations(state);
   },
-  {
-    decorations: (v) => v.decorations,
-  }
-);
+  update(decorations, tr) {
+    if (tr.docChanged || tr.selection || tr.effects.length > 0) {
+      return computeDecorations(tr.state);
+    }
+    return decorations.map(tr.changes);
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
