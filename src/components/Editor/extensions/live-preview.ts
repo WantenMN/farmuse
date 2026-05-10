@@ -1,4 +1,9 @@
-import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
+import {
+  Decoration,
+  DecorationSet,
+  EditorView,
+  ViewPlugin,
+} from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import {
   RangeSet,
@@ -6,6 +11,8 @@ import {
   StateField,
   EditorState,
   SelectionRange,
+  StateEffect,
+  EditorSelection,
 } from "@codemirror/state";
 import { SyntaxNodeRef } from "@lezer/common";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -23,6 +30,105 @@ const hideDecoration = Decoration.replace({});
 const hrDecoration = Decoration.replace({
   widget: new HRWidget(),
 });
+
+/**
+ * State and Effect to track active pointer (mouse) interaction.
+ * This is used to suppress source-mode rendering during selection dragging,
+ * providing a stable preview and avoiding layout shifts.
+ */
+const setPointerActive = StateEffect.define<{
+  active: boolean;
+  selection: SelectionRange | null;
+}>();
+
+const pointerActiveField = StateField.define<{
+  active: boolean;
+  selection: SelectionRange | null;
+}>({
+  create: () => ({ active: false, selection: null }),
+  update: (value, tr) => {
+    for (const effect of tr.effects) {
+      if (effect.is(setPointerActive)) return effect.value;
+    }
+    return value;
+  },
+});
+
+/**
+ * Robustly tracks pointer down/up states across the entire window.
+ */
+const pointerInteractionPlugin = ViewPlugin.fromClass(
+  class {
+    constructor(public view: EditorView) {}
+  },
+  {
+    eventHandlers: {
+      mousedown(event, view) {
+        if (event.button !== 0) return;
+
+        view.dispatch({
+          effects: setPointerActive.of({
+            active: true,
+            selection: view.state.selection.main,
+          }),
+        });
+
+        const onUp = () => {
+          const sel = view.state.selection.main;
+          let newSel = sel;
+
+          // Essential fix: If a link is selected in preview mode, expand the selection
+          // to include hidden source markers once pointer is released.
+          if (!sel.empty) {
+            syntaxTree(view.state).iterate({
+              from: sel.from,
+              to: sel.to,
+              enter: (node) => {
+                if (node.name === "Link") {
+                  const firstMark = node.node.firstChild;
+                  if (firstMark && firstMark.name === "LinkMark") {
+                    let secondMark = null;
+                    let child = firstMark.nextSibling;
+                    while (child) {
+                      if (child.name === "LinkMark") {
+                        secondMark = child;
+                        break;
+                      }
+                      child = child.nextSibling;
+                    }
+
+                    if (secondMark) {
+                      let from = sel.from;
+                      let to = sel.to;
+                      if (from === firstMark.to) from = node.from;
+                      if (to === secondMark.from) to = node.to;
+
+                      if (from !== sel.from || to !== sel.to) {
+                        newSel = EditorSelection.range(from, to);
+                      }
+                    }
+                  }
+                  return false;
+                }
+              },
+            });
+          }
+
+          view.dispatch({
+            effects: setPointerActive.of({ active: false, selection: null }),
+            selection:
+              newSel !== sel ? EditorSelection.create([newSel]) : undefined,
+          });
+          window.removeEventListener("mouseup", onUp);
+          window.removeEventListener("blur", onUp);
+        };
+
+        window.addEventListener("mouseup", onUp);
+        window.addEventListener("blur", onUp);
+      },
+    },
+  }
+);
 
 /**
  * Handle Table rendering
@@ -53,7 +159,7 @@ function handleTable(
 function handleImage(
   node: SyntaxNodeRef,
   state: EditorState,
-  selection: SelectionRange,
+  selection: SelectionRange | null,
   builder: RangeSetBuilder<Decoration>
 ): number | null {
   if (node.name !== "Image") return null;
@@ -63,7 +169,8 @@ function handleImage(
     return node.to;
   }
 
-  const isSelected = selection.from <= node.to && selection.to >= node.from;
+  const isSelected =
+    selection && selection.from <= node.to && selection.to >= node.from;
 
   const fullText = state.doc.sliceString(node.from, node.to);
   const match = fullText.match(/^!\[(.*?)\]\((.*?)\)$/);
@@ -95,7 +202,7 @@ function handleImage(
         width,
         node.from,
         node.to,
-        isSelected
+        isSelected ?? false
       ),
     })
   );
@@ -107,12 +214,13 @@ function handleImage(
  */
 function handleHorizontalRule(
   node: SyntaxNodeRef,
-  selection: SelectionRange,
+  selection: SelectionRange | null,
   builder: RangeSetBuilder<Decoration>
 ): number | null {
   if (node.name !== "HorizontalRule") return null;
 
-  const isSelected = selection.from <= node.to && selection.to >= node.from;
+  const isSelected =
+    selection && selection.from <= node.to && selection.to >= node.from;
   if (!isSelected) {
     builder.add(node.from, node.to, hrDecoration);
     return node.to;
@@ -126,14 +234,15 @@ function handleHorizontalRule(
 function handleLinkAndURL(
   node: SyntaxNodeRef,
   state: EditorState,
-  selection: SelectionRange,
+  selection: SelectionRange | null,
   linkBuilder: RangeSetBuilder<Decoration>
 ): void {
   if (
     node.name === "Link" ||
     (node.name === "URL" && node.node.parent?.name !== "Link")
   ) {
-    const isSelected = selection.from <= node.to && selection.to >= node.from;
+    const isSelected =
+      selection && selection.from <= node.to && selection.to >= node.from;
     if (!isSelected) {
       let url = "";
       if (node.name === "Link") {
@@ -170,7 +279,7 @@ function handleLinkAndURL(
 function handleMarks(
   node: SyntaxNodeRef,
   state: EditorState,
-  selection: SelectionRange,
+  selection: SelectionRange | null,
   builder: RangeSetBuilder<Decoration>
 ): number | null {
   const marks = [
@@ -193,8 +302,10 @@ function handleMarks(
   const container = node.node.parent;
   if (!container) return null;
 
-  const line = state.doc.lineAt(selection.from);
-  const isOnSameLine = node.from >= line.from && node.to <= line.to;
+  const line = selection ? state.doc.lineAt(selection.from) : null;
+  const isOnSameLine = line
+    ? node.from >= line.from && node.to <= line.to
+    : false;
 
   const formattingContainers = [
     "Emphasis",
@@ -207,18 +318,23 @@ function handleMarks(
   ];
 
   const isInsideContainer =
+    selection &&
     formattingContainers.includes(container.name) &&
     selection.from <= container.to &&
     selection.to >= container.from;
 
   const isSelected =
-    (isOnSameLine && container.name !== "Link") ||
-    isInsideContainer ||
-    (selection.from <= node.to && selection.to >= node.from);
+    selection &&
+    (isInsideContainer ||
+      (selection.from <= node.to && selection.to >= node.from) ||
+      (isOnSameLine &&
+        (node.name === "HeaderMark" ||
+          node.name === "ListMark" ||
+          node.name === "QuoteMark")));
 
   // 1. Handle Headings
   if (node.name === "HeaderMark") {
-    return handleHeader(node, state, isSelected, builder);
+    return handleHeader(node, state, isSelected ?? false, builder);
   }
 
   // 2. Handle Lists and Tasks
@@ -233,7 +349,7 @@ function handleMarks(
 
   // 3. Handle Code marks
   if (node.name === "CodeMark" || node.name === "CodeInfo") {
-    return handleCodeMark(node, isSelected, builder);
+    return handleCodeMark(node, isSelected ?? false, builder);
   }
 
   // 4. Handle Emphasis marks
@@ -242,7 +358,7 @@ function handleMarks(
     node.name === "StrongEmphasisMark" ||
     node.name === "StrikethroughMark"
   ) {
-    return handleEmphasisMark(node, isSelected, builder);
+    return handleEmphasisMark(node, isSelected ?? false, builder);
   }
 
   // 5. Handle Other marks (Quote, Link, etc.)
@@ -327,7 +443,7 @@ function handleListFallback(
 }
 
 /**
- * Handle Code markers
+ * Handle Code marks
  */
 function handleCodeMark(
   node: SyntaxNodeRef,
@@ -342,7 +458,7 @@ function handleCodeMark(
 }
 
 /**
- * Handle Emphasis markers
+ * Handle Emphasis marks
  */
 function handleEmphasisMark(
   node: SyntaxNodeRef,
@@ -362,7 +478,7 @@ function handleEmphasisMark(
 function handleListAndTask(
   node: SyntaxNodeRef,
   state: EditorState,
-  selection: SelectionRange,
+  selection: SelectionRange | null,
   builder: RangeSetBuilder<Decoration>
 ): number | null {
   const line = state.doc.lineAt(node.from);
@@ -376,7 +492,7 @@ function handleListAndTask(
       const taskEnd = taskStart + taskMatch[0].length;
 
       const isTaskSelected =
-        selection.from <= taskEnd && selection.to >= taskStart;
+        selection && selection.from <= taskEnd && selection.to >= taskStart;
 
       if (isTaskSelected) {
         return null;
@@ -409,9 +525,12 @@ function handleListAndTask(
 }
 
 function computeDecorations(state: EditorState) {
+  const interaction = state.field(pointerActiveField);
   const builder = new RangeSetBuilder<Decoration>();
   const linkBuilder = new RangeSetBuilder<Decoration>();
-  const selection = state.selection.main;
+  const selection = interaction.active
+    ? interaction.selection
+    : state.selection.main;
   let lastPos = -1;
 
   syntaxTree(state).iterate({
@@ -455,7 +574,11 @@ function computeDecorations(state: EditorState) {
   return RangeSet.join([builder.finish(), linkBuilder.finish()]);
 }
 
-export const livePreviewPlugin = StateField.define<DecorationSet>({
+/**
+ * The main Live Preview plugin extension.
+ * Consists of the interaction tracker, state field, and the decoration logic.
+ */
+const livePreviewStateField = StateField.define<DecorationSet>({
   create(state) {
     return computeDecorations(state);
   },
@@ -483,3 +606,9 @@ export const livePreviewPlugin = StateField.define<DecorationSet>({
     }),
   ],
 });
+
+export const livePreviewPlugin = [
+  pointerActiveField,
+  pointerInteractionPlugin,
+  livePreviewStateField,
+];
