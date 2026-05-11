@@ -24,11 +24,13 @@ export function useTabs(initialState: TabsState | null) {
   );
 
   const openFile = React.useCallback((path: string, name: string) => {
+    const normalizedPath = path.replace(/\\/g, "/");
     setOpenFiles((prev) => {
-      if (prev.some((f) => f.path === path)) return prev;
-      return [...prev, { path, name }];
+      if (prev.some((f) => f.path.replace(/\\/g, "/") === normalizedPath))
+        return prev;
+      return [...prev, { path: normalizedPath, name }];
     });
-    setActiveFilePath(path);
+    setActiveFilePath(normalizedPath);
   }, []);
 
   const closeFile = React.useCallback(

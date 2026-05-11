@@ -1,4 +1,5 @@
 import * as React from "react";
+import { cn } from "../lib/utils";
 import { useEditor } from "../hooks/useEditor";
 import { useCodeMirror } from "../hooks/useCodeMirror";
 import { useSettingsStore } from "../store/settingsStore";
@@ -23,9 +24,7 @@ export function Editor({ path, name, isActive = false }: EditorProps) {
   const [mode, setMode] = React.useState<EditorMode>("live");
   const editorRef = React.useRef<HTMLDivElement>(null);
 
-  const hasContent = content !== null;
   const extensions = React.useMemo(() => {
-    if (!hasContent) return [];
     return getDefaultExtensions(
       (newContent) => {
         setContent(newContent);
@@ -34,7 +33,7 @@ export function Editor({ path, name, isActive = false }: EditorProps) {
       fontSize,
       showLineNumbers
     );
-  }, [setContent, mode, fontSize, showLineNumbers, hasContent]);
+  }, [setContent, mode, fontSize, showLineNumbers]);
 
   useCodeMirror({
     container: editorRef,
@@ -48,13 +47,12 @@ export function Editor({ path, name, isActive = false }: EditorProps) {
   return (
     <div className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="relative flex-1 overflow-hidden">
-        {loading ? (
-          <EditorLoadingState name={name} />
-        ) : error ? (
-          <EditorErrorState error={error} />
-        ) : (
-          <div className="h-full w-full" ref={editorRef} />
-        )}
+        <div
+          className={cn("h-full w-full", (loading || !!error) && "hidden")}
+          ref={editorRef}
+        />
+        {loading && <EditorLoadingState name={name} />}
+        {error && <EditorErrorState error={error} />}
       </div>
       <EditorStatusBar
         isSaving={isSaving}

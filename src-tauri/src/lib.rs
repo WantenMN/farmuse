@@ -188,6 +188,35 @@ fn resolve_path(path: &str) -> Result<PathBuf, String> {
     }
 }
 
+#[tauri::command]
+fn create_directory(path: String) -> Result<(), String> {
+    let resolved_path = resolve_path(&path)?;
+    fs::create_dir_all(resolved_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn list_all_subdirs(path: String) -> Result<Vec<String>, String> {
+    let resolved_path = resolve_path(&path)?;
+    let mut result = Vec::new();
+    let mut stack = vec![resolved_path];
+
+    while let Some(current) = stack.pop() {
+        if let Ok(entries) = fs::read_dir(current) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if !name.starts_with('.') {
+                        result.push(path.to_string_lossy().to_string());
+                        stack.push(path);
+                    }
+                }
+            }
+        }
+    }
+    Ok(result)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -202,7 +231,9 @@ pub fn run() {
             write_file_content,
             watch_file,
             unwatch_file,
-            watch_explorer_directories
+            watch_explorer_directories,
+            create_directory,
+            list_all_subdirs
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -39,9 +39,9 @@ export function FileExplorerItem({
       <div className="z-10 flex w-4 shrink-0 items-center justify-center">
         {entry.is_dir ? (
           isExpanded ? (
-            <ChevronDown className="text-muted-foreground h-3.5 w-3.5" />
+            <ChevronDown className="h-3.5 w-3.5" />
           ) : (
-            <ChevronRight className="text-muted-foreground h-3.5 w-3.5" />
+            <ChevronRight className="h-3.5 w-3.5" />
           )
         ) : null}
       </div>

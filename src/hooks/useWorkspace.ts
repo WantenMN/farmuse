@@ -12,7 +12,7 @@ interface WorkspaceState {
 
 export function useWorkspace(savedState: WorkspaceState | null) {
   const [currentPath, setCurrentPath] = React.useState<string | null>(
-    savedState?.currentPath || null
+    savedState?.currentPath ? savedState.currentPath.replace(/\\/g, "/") : null
   );
   const [entries, setEntries] = React.useState<FileEntry[]>([]);
 
@@ -33,17 +33,20 @@ export function useWorkspace(savedState: WorkspaceState | null) {
       onBeforeLoad?: () => void,
       onAfterLoad?: () => void
     ) => {
+      const normalizedPath = path.replace(/\\/g, "/");
       if (onBeforeLoad) onBeforeLoad();
 
       try {
         const result = await invoke<FileEntry[]>("list_directory_contents", {
-          path,
+          path: normalizedPath,
         });
 
         if (onAfterLoad) onAfterLoad();
 
-        setEntries(result);
-        setCurrentPath(path);
+        setEntries(
+          result.map((e) => ({ ...e, path: e.path.replace(/\\/g, "/") }))
+        );
+        setCurrentPath(normalizedPath);
         setShowExplorer(true);
 
         // Focus the explorer after a short delay

@@ -12,6 +12,7 @@ import { WelcomeScreen } from "./components/WelcomeScreen";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { useTabs } from "./hooks/useTabs";
+import { commandManager } from "./systems/commandManager";
 import { registerAppCommands, unregisterAppCommands } from "./commands";
 
 function App() {
@@ -41,37 +42,55 @@ function App() {
   const {
     openFiles,
     setOpenFiles,
-    activeFilePath,
+    activeFilePath: rawActiveFilePath,
     setActiveFilePath,
-    openFile,
+    openFile: baseOpenFile,
     closeFile,
     closeOthers,
     closeAll,
     clearTabs,
   } = useTabs(savedState);
 
+  const activeFilePath = React.useMemo(
+    () => (rawActiveFilePath ? rawActiveFilePath.replace(/\\/g, "/") : null),
+    [rawActiveFilePath]
+  );
+
+  const openFile = React.useCallback(
+    (path: string, name: string) => {
+      baseOpenFile(path.replace(/\\/g, "/"), name);
+    },
+    [baseOpenFile]
+  );
+
   const hasRestoredEntries = React.useRef(false);
 
   const handleLoadDirectory = React.useCallback(
     async (path: string, _shouldFocus = true) => {
+      const normalizedPath = path.replace(/\\/g, "/");
       // Save current state before switching
-      if (currentPath && currentPath !== path) {
+      if (currentPath && currentPath !== normalizedPath) {
         localStorage.setItem(
           `tabs_state_${currentPath}`,
           JSON.stringify({ openFiles, activeFilePath })
         );
       }
 
-      await loadDirectory(path, undefined, () => {
+      await loadDirectory(normalizedPath, undefined, () => {
         // If switching folders, load saved state for the new path
-        if (path !== currentPath) {
-          const saved = localStorage.getItem(`tabs_state_${path}`);
+        if (normalizedPath !== currentPath) {
+          const saved = localStorage.getItem(`tabs_state_${normalizedPath}`);
           if (saved) {
             try {
               const { openFiles: savedFiles, activeFilePath: savedActive } =
                 JSON.parse(saved);
-              setOpenFiles(savedFiles);
-              setActiveFilePath(savedActive);
+              setOpenFiles(
+                savedFiles.map((f: { path: string; name: string }) => ({
+                  ...f,
+                  path: f.path.replace(/\\/g, "/"),
+                }))
+              );
+              setActiveFilePath(savedActive?.replace(/\\/g, "/") || null);
             } catch (e) {
               console.error("Failed to parse saved tabs state", e);
             }
@@ -179,6 +198,7 @@ function App() {
           width={explorerWidth}
           onResizeStart={startResizing}
           onOpenFile={openFile}
+          activeFilePath={activeFilePath}
         />
 
         <main className="flex min-w-0 flex-1 flex-col">
@@ -186,7 +206,13 @@ function App() {
             <Tabs
               files={openFiles}
               activePath={activeFilePath}
-              onSelect={setActiveFilePath}
+              onSelect={(path) => {
+                const normalizedPath = path.replace(/\\/g, "/");
+                setActiveFilePath(normalizedPath);
+                commandManager.execute("explorer.revealActiveFile", {
+                  path: normalizedPath,
+                });
+              }}
               onClose={closeFile}
               onCloseOthers={closeOthers}
               onCloseAll={closeAll}
@@ -201,6 +227,11 @@ function App() {
                   "flex min-h-0 flex-1 flex-col",
                   file.path !== activeFilePath && "hidden"
                 )}
+                onMouseDownCapture={() => {
+                  commandManager.execute("explorer.revealActiveFile", {
+                    path: file.path,
+                  });
+                }}
               >
                 {file.path === "settings://" ? (
                   <SettingsPage />

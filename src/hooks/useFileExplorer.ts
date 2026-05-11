@@ -42,10 +42,14 @@ export function useFileExplorer(
           );
           const result: FileExplorerEntry[] = [];
           for (const child of children) {
-            const childEntry = { ...child, depth };
+            const normalizedPath = child.path.replace(/\\/g, "/");
+            const childEntry = { ...child, path: normalizedPath, depth };
             result.push(childEntry);
-            if (child.is_dir && currentExpanded.has(child.path)) {
-              const descendants = await fetchRecursive(child.path, depth + 1);
+            if (child.is_dir && currentExpanded.has(normalizedPath)) {
+              const descendants = await fetchRecursive(
+                normalizedPath,
+                depth + 1
+              );
               result.push(...descendants);
             }
           }
@@ -63,9 +67,10 @@ export function useFileExplorer(
         );
         const newEntries: FileExplorerEntry[] = [];
         for (const rootEntry of rootEntriesFetched) {
-          newEntries.push({ ...rootEntry, depth: 0 });
-          if (rootEntry.is_dir && currentExpanded.has(rootEntry.path)) {
-            const descendants = await fetchRecursive(rootEntry.path, 1);
+          const normalizedPath = rootEntry.path.replace(/\\/g, "/");
+          newEntries.push({ ...rootEntry, path: normalizedPath, depth: 0 });
+          if (rootEntry.is_dir && currentExpanded.has(normalizedPath)) {
+            const descendants = await fetchRecursive(normalizedPath, 1);
             newEntries.push(...descendants);
           }
         }
@@ -99,10 +104,19 @@ export function useFileExplorer(
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          const savedExpanded = new Set<string>(parsed.expandedPaths);
+          const savedExpanded = new Set<string>(
+            (parsed.expandedPaths || []).map((p: string) =>
+              p.replace(/\\/g, "/")
+            )
+          );
           setExpandedPaths(savedExpanded);
-          setEntries(parsed.entries);
-          setFocusedPath(parsed.focusedPath);
+          setEntries(
+            (parsed.entries || []).map((e: FileExplorerEntry) => ({
+              ...e,
+              path: e.path.replace(/\\/g, "/"),
+            }))
+          );
+          setFocusedPath(parsed.focusedPath?.replace(/\\/g, "/") || null);
           hasRestored.current = true;
           refreshTree(savedExpanded);
         } catch (e) {
@@ -124,7 +138,10 @@ export function useFileExplorer(
   // Sync focusedIndex and focusedPath
   React.useEffect(() => {
     if (focusedPath) {
-      const index = entries.findIndex((e) => e.path === focusedPath);
+      const normalizedFocused = focusedPath.replace(/\\/g, "/");
+      const index = entries.findIndex(
+        (e) => e.path.replace(/\\/g, "/") === normalizedFocused
+      );
       if (index !== -1) {
         if (index !== focusedIndex) {
           setFocusedIndex(index);
@@ -133,7 +150,7 @@ export function useFileExplorer(
         setFocusedIndex(entries.length > 0 ? 0 : -1);
       }
     } else if (focusedIndex !== -1 && entries[focusedIndex]) {
-      setFocusedPath(entries[focusedIndex].path);
+      setFocusedPath(entries[focusedIndex].path.replace(/\\/g, "/"));
     }
   }, [entries, focusedPath, focusedIndex]);
 
@@ -190,11 +207,12 @@ export function useFileExplorer(
       const entry = entries[index];
       if (!entry || !entry.is_dir) return;
 
-      const isExpanded = expandedPaths.has(entry.path);
+      const normalizedPath = entry.path.replace(/\\/g, "/");
+      const isExpanded = expandedPaths.has(normalizedPath);
       const newExpandedPaths = new Set(expandedPaths);
 
       if (isExpanded) {
-        newExpandedPaths.delete(entry.path);
+        newExpandedPaths.delete(normalizedPath);
         const newEntries = [...entries];
         let removeCount = 0;
         for (let i = index + 1; i < newEntries.length; i++) {
@@ -208,7 +226,7 @@ export function useFileExplorer(
         setEntries(newEntries);
         setExpandedPaths(newExpandedPaths);
       } else {
-        newExpandedPaths.add(entry.path);
+        newExpandedPaths.add(normalizedPath);
 
         const fetchRecursive = async (
           path: string,
@@ -220,10 +238,14 @@ export function useFileExplorer(
           );
           const result: FileExplorerEntry[] = [];
           for (const child of children) {
-            const childEntry = { ...child, depth };
+            const childNormalizedPath = child.path.replace(/\\/g, "/");
+            const childEntry = { ...child, path: childNormalizedPath, depth };
             result.push(childEntry);
-            if (child.is_dir && newExpandedPaths.has(child.path)) {
-              const descendants = await fetchRecursive(child.path, depth + 1);
+            if (child.is_dir && newExpandedPaths.has(childNormalizedPath)) {
+              const descendants = await fetchRecursive(
+                childNormalizedPath,
+                depth + 1
+              );
               result.push(...descendants);
             }
           }
@@ -232,7 +254,7 @@ export function useFileExplorer(
 
         try {
           const childrenWithDescendants = await fetchRecursive(
-            entry.path,
+            normalizedPath,
             entry.depth + 1
           );
           const newEntries = [...entries];
@@ -257,5 +279,8 @@ export function useFileExplorer(
     isActive,
     setIsActive,
     toggleFolder,
+    refreshTree,
+    setExpandedPaths,
+    setEntries,
   };
 }
