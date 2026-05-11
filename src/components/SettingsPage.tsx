@@ -1,4 +1,3 @@
-import * as React from "react";
 import { useSettingsStore } from "@/store/settingsStore";
 import { Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";

@@ -234,6 +234,7 @@ export function FileExplorer({
     commandManager.register({
       id: "explorer.revealActiveFile",
       name: "Explorer: Reveal Active File",
+      description: "Reveal the active file in the explorer",
       handler,
       visible: false,
     });

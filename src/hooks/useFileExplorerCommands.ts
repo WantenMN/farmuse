@@ -7,7 +7,7 @@ interface UseFileExplorerCommandsProps {
   setIsActive: (active: boolean) => void;
   entries: FileExplorerEntry[];
   focusedIndex: number;
-  setFocusedIndex: (index: number) => void;
+  setFocusedIndex: React.Dispatch<React.SetStateAction<number>>;
   setFocusedPath: (path: string | null) => void;
   expandedPaths: Set<string>;
   toggleFolder: (index: number) => Promise<void>;

@@ -1,5 +1,3 @@
-import * as React from "react";
-
 interface WelcomeScreenProps {
   currentPath: string | null;
 }

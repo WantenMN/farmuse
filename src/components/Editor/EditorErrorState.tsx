@@ -1,4 +1,3 @@
-import * as React from "react";
 import { AlertCircle } from "lucide-react";
 
 interface EditorErrorStateProps {
