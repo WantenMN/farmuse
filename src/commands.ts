@@ -51,6 +51,22 @@ export function registerGlobalCommands() {
       }
     },
   });
+
+  commandManager.register({
+    id: "new-window",
+    name: "New Window",
+    description: "Open a new application window",
+    handler: async () => {
+      try {
+        const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+        new WebviewWindow(`main-${Math.random().toString(36).slice(2, 9)}`, {
+          url: "index.html",
+        });
+      } catch (e) {
+        console.error("Failed to open new window", e);
+      }
+    },
+  });
 }
 
 /**
