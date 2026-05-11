@@ -108,7 +108,7 @@ const pointerInteractionPlugin = ViewPlugin.fromClass(
                   }
                 }
               }
-            } catch (err) {
+            } catch {
               // Ignore errors during potential rapid re-renders
             }
           }

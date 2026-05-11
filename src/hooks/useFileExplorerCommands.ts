@@ -12,6 +12,7 @@ interface UseFileExplorerCommandsProps {
   expandedPaths: Set<string>;
   toggleFolder: (index: number) => Promise<void>;
   scrollContainerRef: React.RefObject<HTMLDivElement>;
+  onOpenFile: (path: string, name: string) => void;
 }
 
 export function useFileExplorerCommands({
@@ -24,6 +25,7 @@ export function useFileExplorerCommands({
   expandedPaths,
   toggleFolder,
   scrollContainerRef,
+  onOpenFile,
 }: UseFileExplorerCommandsProps) {
   React.useEffect(() => {
     commandManager.register({
@@ -83,10 +85,7 @@ export function useFileExplorerCommands({
             toggleFolder(focusedIndex);
           }
         } else {
-          commandManager.execute("open-file", {
-            path: entry.path,
-            name: entry.name,
-          });
+          onOpenFile(entry.path, entry.name);
         }
       },
       visible: true,
@@ -139,10 +138,7 @@ export function useFileExplorerCommands({
         if (entry.is_dir) {
           toggleFolder(focusedIndex);
         } else {
-          commandManager.execute("open-file", {
-            path: entry.path,
-            name: entry.name,
-          });
+          onOpenFile(entry.path, entry.name);
         }
       },
       visible: true,
@@ -166,5 +162,6 @@ export function useFileExplorerCommands({
     setFocusedIndex,
     setFocusedPath,
     scrollContainerRef,
+    onOpenFile,
   ]);
 }

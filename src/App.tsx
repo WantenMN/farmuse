@@ -3,20 +3,16 @@ import { cn } from "./lib/utils";
 import { TitleBar } from "./components/TitleBar";
 import { ResizeHandles } from "./components/ResizeHandles";
 import { CommandPalette } from "./components/CommandPalette";
-import { PathPalette } from "./components/PathPalette";
 import { FileExplorer } from "./components/FileExplorer";
 import { SideBar } from "./components/SideBar";
 import { Editor } from "./components/Editor";
 import { SettingsPage } from "./components/SettingsPage";
 import { Tabs } from "./components/Tabs";
 import { WelcomeScreen } from "./components/WelcomeScreen";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { useTabs } from "./hooks/useTabs";
-import {
-  registerAppCommands,
-  unregisterAppCommands,
-  COMMAND_METADATA,
-} from "./commands";
+import { registerAppCommands, unregisterAppCommands } from "./commands";
 
 function App() {
   const [savedState] = React.useState(() => {
@@ -134,6 +130,20 @@ function App() {
     clearTabs();
   }, [currentPath, openFiles, activeFilePath, closeWorkspaceFolder, clearTabs]);
 
+  const openFolder = React.useCallback(async () => {
+    try {
+      const selected = await openDialog({
+        directory: true,
+        multiple: false,
+      });
+      if (selected && typeof selected === "string") {
+        handleLoadDirectory(selected);
+      }
+    } catch (e) {
+      console.error("Failed to open folder dialog", e);
+    }
+  }, [handleLoadDirectory]);
+
   React.useEffect(() => {
     registerAppCommands({
       toggleExplorer: () => setShowExplorer((prev: boolean) => !prev),
@@ -143,12 +153,13 @@ function App() {
           closeFile(activeFilePath);
         }
       },
+      openFolder,
     });
 
     return () => {
       unregisterAppCommands();
     };
-  }, [activeFilePath, closeFile, closeFolder, setShowExplorer]);
+  }, [activeFilePath, closeFile, closeFolder, openFolder, setShowExplorer]);
 
   return (
     <div className="bg-background text-foreground border-border flex h-screen w-screen flex-col overflow-hidden border">
@@ -167,6 +178,7 @@ function App() {
           isVisible={showExplorer}
           width={explorerWidth}
           onResizeStart={startResizing}
+          onOpenFile={openFile}
         />
 
         <main className="flex min-w-0 flex-1 flex-col">
@@ -208,22 +220,6 @@ function App() {
       </div>
 
       <CommandPalette />
-      <PathPalette
-        commandId={COMMAND_METADATA.OPEN_FOLDER.id}
-        commandName={COMMAND_METADATA.OPEN_FOLDER.name}
-        commandDescription={COMMAND_METADATA.OPEN_FOLDER.description}
-        mode="folder"
-        placeholder="Enter directory path..."
-        onSelect={(path) => handleLoadDirectory(path)}
-      />
-      <PathPalette
-        commandId={COMMAND_METADATA.OPEN_FILE.id}
-        commandName={COMMAND_METADATA.OPEN_FILE.name}
-        commandDescription={COMMAND_METADATA.OPEN_FILE.description}
-        mode="file"
-        placeholder="Search for a file..."
-        onSelect={openFile}
-      />
     </div>
   );
 }

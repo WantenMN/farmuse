@@ -45,7 +45,7 @@ export function TitleBar() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="hover:bg-muted rounded px-2 py-1 text-xs font-medium transition-colors focus:outline-none">
-              File
+              Folder
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-48">

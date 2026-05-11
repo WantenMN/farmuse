@@ -1,6 +1,5 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { commandManager } from "../systems/commandManager";
 import { FileEntry as RawFileEntry } from "../types";
 import { useFileExplorer } from "../hooks/useFileExplorer";
 import { useFileExplorerCommands } from "../hooks/useFileExplorerCommands";
@@ -12,7 +11,8 @@ interface FileExplorerProps {
   entries: RawFileEntry[];
   isVisible: boolean;
   width: number;
-  onResizeStart: () => void;
+  onResizeStart: (e: React.MouseEvent) => void;
+  onOpenFile: (path: string, name: string) => void;
 }
 
 export function FileExplorer({
@@ -21,6 +21,7 @@ export function FileExplorer({
   isVisible,
   width,
   onResizeStart,
+  onOpenFile,
 }: FileExplorerProps) {
   const {
     entries,
@@ -46,6 +47,7 @@ export function FileExplorer({
     expandedPaths,
     toggleFolder,
     scrollContainerRef,
+    onOpenFile,
   });
 
   // Scroll focused item into view
@@ -82,7 +84,7 @@ export function FileExplorer({
         onMouseDown={(e) => {
           if (e.button === 0) {
             e.preventDefault();
-            onResizeStart();
+            onResizeStart(e);
           }
         }}
       />
@@ -120,10 +122,7 @@ export function FileExplorer({
                     if (entry.is_dir) {
                       toggleFolder(index);
                     } else {
-                      commandManager.execute("open-file", {
-                        path: entry.path,
-                        name: entry.name,
-                      });
+                      onOpenFile(entry.path, entry.name);
                     }
                   }}
                 />

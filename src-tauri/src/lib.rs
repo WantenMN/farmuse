@@ -194,6 +194,7 @@ pub fn run() {
         .manage(WatcherState(Mutex::new(None)))
         .manage(ExplorerWatcherState(Mutex::new(None)))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             list_directory_contents,
             list_subdirs,

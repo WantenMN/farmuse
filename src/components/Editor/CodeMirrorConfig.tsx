@@ -12,7 +12,6 @@ import {
   indentOnInput,
   syntaxHighlighting,
   defaultHighlightStyle,
-  bracketMatching,
 } from "@codemirror/language";
 import { history, defaultKeymap, historyKeymap } from "@codemirror/commands";
 import { closeBrackets } from "@codemirror/autocomplete";

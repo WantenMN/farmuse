@@ -16,10 +16,15 @@ export function useExplorerResize({
   const [width, setWidth] = React.useState(initialWidth);
   const [isVisible, setIsVisible] = React.useState(initialVisible);
   const [isResizing, setIsResizing] = React.useState(false);
+  const [dragOffset, setDragOffset] = React.useState(0);
 
-  const startResizing = React.useCallback(() => {
-    setIsResizing(true);
-  }, []);
+  const startResizing = React.useCallback(
+    (e: React.MouseEvent) => {
+      setIsResizing(true);
+      setDragOffset(e.clientX - width);
+    },
+    [width]
+  );
 
   const stopResizing = React.useCallback(() => {
     setIsResizing(false);
@@ -28,9 +33,9 @@ export function useExplorerResize({
   const resize = React.useCallback(
     (e: MouseEvent) => {
       if (isResizing) {
-        const newWidth = e.clientX;
+        const newWidth = e.clientX - dragOffset;
         const windowWidth = window.innerWidth;
-        const maxWidth = windowWidth - minEditorWidth;
+        const maxWidth = windowWidth - dragOffset - minEditorWidth;
 
         const hideThreshold = minWidth * 0.2;
         const showThreshold = minWidth * 0.5;
@@ -49,7 +54,7 @@ export function useExplorerResize({
         }
       }
     },
-    [isResizing, isVisible, minWidth, minEditorWidth]
+    [isResizing, isVisible, minWidth, minEditorWidth, dragOffset]
   );
 
   React.useEffect(() => {

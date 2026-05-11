@@ -76,6 +76,7 @@ export function registerAppCommands(handlers: {
   toggleExplorer: () => void;
   closeFolder: () => void;
   closeFile: () => void;
+  openFolder: () => void;
 }) {
   commandManager.register({
     id: "toggle-explorer",
@@ -97,6 +98,13 @@ export function registerAppCommands(handlers: {
     description: "Close the currently open file",
     handler: handlers.closeFile,
   });
+
+  commandManager.register({
+    id: "open-folder",
+    name: "Open Folder",
+    description: "Open a directory to view its contents",
+    handler: handlers.openFolder,
+  });
 }
 
 /**
@@ -108,11 +116,6 @@ export const COMMAND_METADATA = {
     name: "Open Folder",
     description: "Open a directory to view its contents",
   },
-  OPEN_FILE: {
-    id: "open-file",
-    name: "Open File",
-    description: "Search and open a file",
-  },
 };
 
 /**
@@ -122,4 +125,5 @@ export function unregisterAppCommands() {
   commandManager.unregister("toggle-explorer");
   commandManager.unregister("close-folder");
   commandManager.unregister("close-file");
+  commandManager.unregister("open-folder");
 }
