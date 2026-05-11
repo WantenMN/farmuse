@@ -41,6 +41,8 @@ const setPointerActive = StateEffect.define<{
   selection: SelectionRange | null;
 }>();
 
+const setComposing = StateEffect.define<boolean>();
+
 const pointerActiveField = StateField.define<{
   active: boolean;
   selection: SelectionRange | null;
@@ -53,6 +55,32 @@ const pointerActiveField = StateField.define<{
     return value;
   },
 });
+
+const composingField = StateField.define<boolean>({
+  create: () => false,
+  update: (value, tr) => {
+    for (const effect of tr.effects) {
+      if (effect.is(setComposing)) return effect.value;
+    }
+    return value;
+  },
+});
+
+const compositionPlugin = ViewPlugin.fromClass(
+  class {
+    constructor(public view: EditorView) {}
+  },
+  {
+    eventHandlers: {
+      compositionstart(_event, view) {
+        view.dispatch({ effects: setComposing.of(true) });
+      },
+      compositionend(_event, view) {
+        view.dispatch({ effects: setComposing.of(false) });
+      },
+    },
+  }
+);
 
 /**
  * Robustly tracks pointer down/up states across the entire window.
@@ -655,6 +683,10 @@ const livePreviewStateField = StateField.define<DecorationSet>({
     return computeDecorations(state);
   },
   update(decorations, tr) {
+    const isComposing = tr.state.field(composingField);
+    if (isComposing) {
+      return decorations.map(tr.changes);
+    }
     if (tr.docChanged || tr.selection || tr.effects.length > 0) {
       return computeDecorations(tr.state);
     }
@@ -681,6 +713,8 @@ const livePreviewStateField = StateField.define<DecorationSet>({
 
 export const livePreviewPlugin = [
   pointerActiveField,
+  composingField,
   pointerInteractionPlugin,
+  compositionPlugin,
   livePreviewStateField,
 ];
