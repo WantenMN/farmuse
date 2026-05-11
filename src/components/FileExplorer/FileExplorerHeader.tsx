@@ -1,21 +1,35 @@
-import * as React from "react";
-import { Folder } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface FileExplorerHeaderProps {
   currentPath: string | null;
+  isExpanded: boolean;
+  onToggle: () => void;
 }
 
-export function FileExplorerHeader({ currentPath }: FileExplorerHeaderProps) {
+export function FileExplorerHeader({
+  currentPath,
+  isExpanded,
+  onToggle,
+}: FileExplorerHeaderProps) {
   return (
-    <div className="bg-background/50 flex min-h-[48px] items-center gap-2 overflow-hidden border-b p-3">
-      <Folder className="text-primary/70 h-4 w-4 shrink-0" />
+    <div
+      className="hover:bg-accent/50 flex h-8 cursor-pointer items-center gap-1 px-1 transition-colors select-none"
+      onClick={onToggle}
+    >
+      <div className="flex w-4 items-center justify-center">
+        {isExpanded ? (
+          <ChevronDown className="text-muted-foreground h-3.5 w-3.5" />
+        ) : (
+          <ChevronRight className="text-muted-foreground h-3.5 w-3.5" />
+        )}
+      </div>
       <h2
-        className="text-muted-foreground truncate text-xs font-bold tracking-wider uppercase"
+        className="text-muted-foreground flex-1 truncate text-xs font-bold tracking-wider uppercase"
         title={currentPath || "No Folder"}
       >
         {currentPath
-          ? currentPath.split("/").filter(Boolean).pop() || "Root"
-          : "No folder"}
+          ? currentPath.split(/[/\\]/).filter(Boolean).pop() || "Root"
+          : "NO FOLDER"}
       </h2>
     </div>
   );

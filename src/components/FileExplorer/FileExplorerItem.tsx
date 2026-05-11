@@ -6,7 +6,6 @@ import { FileExplorerEntry } from "../../hooks/useFileExplorer";
 interface FileExplorerItemProps {
   entry: FileExplorerEntry;
   isFocused: boolean;
-  isActive: boolean;
   isExpanded: boolean;
   onClick: (e: React.MouseEvent) => void;
 }
@@ -14,7 +13,6 @@ interface FileExplorerItemProps {
 export function FileExplorerItem({
   entry,
   isFocused,
-  isActive,
   isExpanded,
   onClick,
 }: FileExplorerItemProps) {
@@ -22,12 +20,7 @@ export function FileExplorerItem({
     <div
       className={cn(
         "group relative flex cursor-pointer items-center gap-1 rounded-sm px-1.5 py-0.5 text-sm transition-none",
-        isFocused &&
-          isActive &&
-          "bg-accent text-accent-foreground ring-primary/30 z-10 ring-1",
-        isFocused &&
-          !isActive &&
-          "bg-accent/50 text-accent-foreground/80 ring-muted-foreground/20 z-10 ring-1",
+        isFocused && "bg-accent text-accent-foreground z-10",
         !isFocused && "hover:bg-accent/30"
       )}
       style={{ paddingLeft: `${entry.depth * 12 + 6}px` }}

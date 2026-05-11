@@ -34,6 +34,7 @@ export function FileExplorer({
     toggleFolder,
   } = useFileExplorer(currentPath, rootEntries);
 
+  const [isExpanded, setIsExpanded] = React.useState(true);
   const [prevFocusedIndex, setPrevFocusedIndex] = React.useState<number>(-1);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -73,8 +74,7 @@ export function FileExplorer({
   return (
     <aside
       className={cn(
-        "bg-muted/30 focus-within:ring-primary/20 focus-within:bg-muted/50 group relative flex h-full shrink-0 flex-col overflow-hidden border-r focus-within:ring-1 focus-within:ring-inset",
-        isActive && "bg-muted/50",
+        "group relative flex h-full shrink-0 flex-col overflow-hidden border-r",
         !isVisible && "hidden"
       )}
       style={{ width: `${width}px` }}
@@ -88,8 +88,17 @@ export function FileExplorer({
           }
         }}
       />
-      <FileExplorerHeader currentPath={currentPath} />
-      <div className="flex min-h-0 flex-1 flex-col py-1">
+      <FileExplorerHeader
+        currentPath={currentPath}
+        isExpanded={isExpanded}
+        onToggle={() => setIsExpanded(!isExpanded)}
+      />
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col overflow-hidden py-1",
+          !isExpanded && "hidden"
+        )}
+      >
         <div
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto px-1 outline-none"
@@ -112,7 +121,6 @@ export function FileExplorer({
                   key={entry.path}
                   entry={entry}
                   isFocused={index === focusedIndex}
-                  isActive={isActive}
                   isExpanded={expandedPaths.has(entry.path)}
                   onClick={(e) => {
                     e.stopPropagation();
