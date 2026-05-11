@@ -138,6 +138,29 @@ impl DbManager {
         Ok(())
     }
 
+    pub async fn clear_root_index(&self, root: &str) -> Result<(), String> {
+        sqlx::query("DELETE FROM markdown_files WHERE root = ?1")
+            .bind(root)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub async fn get_by_root(&self, root: &str) -> Result<Vec<MarkdownFile>, String> {
+        let rows = sqlx::query("SELECT id, path, filename FROM markdown_files WHERE root = ?1")
+            .bind(root)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(rows.into_iter().map(|row| MarkdownFile {
+            id: row.get(0),
+            path: row.get(1),
+            filename: row.get(2),
+        }).collect())
+    }
+
     pub async fn get_all(&self) -> Result<Vec<MarkdownFile>, String> {
         let rows = sqlx::query("SELECT id, path, filename FROM markdown_files")
             .fetch_all(&self.pool)

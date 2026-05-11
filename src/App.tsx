@@ -9,6 +9,7 @@ import { FileExplorer } from "./components/FileExplorer";
 import { SideBar } from "./components/SideBar";
 import { Editor } from "./components/Editor";
 import { SettingsPage } from "./components/SettingsPage";
+import { RecentFoldersPage } from "./components/RecentFoldersPage";
 import { Tabs } from "./components/Tabs";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -75,6 +76,7 @@ function App() {
   const handleLoadDirectory = React.useCallback(
     async (path: string, _shouldFocus = true) => {
       const normalizedPath = path.replace(/\\/g, "/");
+
       // Save current state before switching
       if (currentPath && currentPath !== normalizedPath) {
         localStorage.setItem(
@@ -84,6 +86,45 @@ function App() {
       }
 
       await loadDirectory(normalizedPath, undefined, async () => {
+        // Handle tab switching and restoration
+        if (normalizedPath !== currentPath) {
+          const saved = localStorage.getItem(`tabs_state_${normalizedPath}`);
+          let restoredFiles: { path: string; name: string }[] = [];
+          let savedActive: string | null = null;
+
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              restoredFiles = (parsed.openFiles || []).map(
+                (f: { path: string; name: string }) => ({
+                  ...f,
+                  path: f.path.replace(/\\/g, "/"),
+                })
+              );
+              savedActive = parsed.activeFilePath?.replace(/\\/g, "/") || null;
+            } catch (e) {
+              console.error("Failed to parse saved tabs state", e);
+            }
+          }
+
+          setOpenFiles((prev) => {
+            const internalTabs = prev.filter((f) => f.path.includes("://"));
+            const merged = [...internalTabs];
+            restoredFiles.forEach((f) => {
+              if (!merged.find((m) => m.path === f.path)) {
+                merged.push(f);
+              }
+            });
+            return merged;
+          });
+
+          setActiveFilePath((prev) => {
+            if (savedActive) return savedActive;
+            if (restoredFiles.length > 0) return restoredFiles[0].path;
+            return prev && prev.includes("://") ? prev : null;
+          });
+        }
+
         // Initialize indexer for the new folder
         try {
           await invoke("initialize_indexer", { rootPath: normalizedPath });
@@ -91,27 +132,16 @@ function App() {
           console.error("Failed to initialize indexer", e);
         }
 
-        // If switching folders, load saved state for the new path
-        if (normalizedPath !== currentPath) {
-          const saved = localStorage.getItem(`tabs_state_${normalizedPath}`);
-          if (saved) {
-            try {
-              const { openFiles: savedFiles, activeFilePath: savedActive } =
-                JSON.parse(saved);
-              setOpenFiles(
-                savedFiles.map((f: { path: string; name: string }) => ({
-                  ...f,
-                  path: f.path.replace(/\\/g, "/"),
-                }))
-              );
-              setActiveFilePath(savedActive?.replace(/\\/g, "/") || null);
-            } catch (e) {
-              console.error("Failed to parse saved tabs state", e);
-            }
-          } else {
-            clearTabs();
-          }
-        }
+        // Add to recent folders
+        const recent = JSON.parse(
+          localStorage.getItem("farmuse_recent_folders") || "[]"
+        );
+        const updated = [
+          normalizedPath,
+          ...recent.filter((p: string) => p !== normalizedPath),
+        ].slice(0, 20);
+        localStorage.setItem("farmuse_recent_folders", JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent("recent-folders-updated"));
       });
     },
     [
@@ -121,7 +151,6 @@ function App() {
       loadDirectory,
       setOpenFiles,
       setActiveFilePath,
-      clearTabs,
     ]
   );
 
@@ -187,12 +216,20 @@ function App() {
         }
       },
       openFolder,
+      openRecentFolders: () => openFile("recent-folders://", "Recent Folders"),
     });
 
     return () => {
       unregisterAppCommands();
     };
-  }, [activeFilePath, closeFile, closeFolder, openFolder, setShowExplorer]);
+  }, [
+    activeFilePath,
+    closeFile,
+    closeFolder,
+    openFolder,
+    setShowExplorer,
+    openFile,
+  ]);
 
   return (
     <div className="bg-background text-foreground border-border flex h-screen w-screen flex-col overflow-hidden border">
@@ -249,6 +286,17 @@ function App() {
               >
                 {file.path === "settings://" ? (
                   <SettingsPage />
+                ) : file.path === "recent-folders://" ? (
+                  <RecentFoldersPage
+                    onOpenFolder={handleLoadDirectory}
+                    currentPath={currentPath}
+                    onRemoveFolder={(path) => {
+                      if (currentPath === path) {
+                        closeWorkspaceFolder();
+                        clearTabs();
+                      }
+                    }}
+                  />
                 ) : (
                   <Editor
                     path={file.path}
@@ -265,7 +313,7 @@ function App() {
       </div>
 
       <CommandPalette />
-      <QuickOpen onOpenFile={openFile} />
+      <QuickOpen onOpenFile={openFile} currentPath={currentPath} />
       <GlobalStatusBar />
     </div>
   );

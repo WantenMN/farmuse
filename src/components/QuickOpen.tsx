@@ -21,9 +21,10 @@ interface MarkdownFile {
 
 interface QuickOpenProps {
   onOpenFile: (path: string, name: string) => void;
+  currentPath: string | null;
 }
 
-export function QuickOpen({ onOpenFile }: QuickOpenProps) {
+export function QuickOpen({ onOpenFile, currentPath }: QuickOpenProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [results, setResults] = React.useState<MarkdownFile[]>([]);
@@ -55,6 +56,7 @@ export function QuickOpen({ onOpenFile }: QuickOpenProps) {
       try {
         const files = await invoke<MarkdownFile[]>("search_markdown_files", {
           query: search,
+          rootPath: currentPath,
         });
         setResults(files);
         if (files.length > 0) {
@@ -70,7 +72,7 @@ export function QuickOpen({ onOpenFile }: QuickOpenProps) {
     if (open) {
       fetchResults();
     }
-  }, [search, open]);
+  }, [search, open, currentPath]);
 
   return (
     <CommandDialog

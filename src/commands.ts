@@ -77,6 +77,7 @@ export function registerAppCommands(handlers: {
   closeFolder: () => void;
   closeFile: () => void;
   openFolder: () => void;
+  openRecentFolders: () => void;
 }) {
   commandManager.register({
     id: "toggle-explorer",
@@ -105,6 +106,13 @@ export function registerAppCommands(handlers: {
     description: "Open a directory to view its contents",
     handler: handlers.openFolder,
   });
+
+  commandManager.register({
+    id: "open-recent-folders",
+    name: "Open Recent Folders",
+    description: "Show recently opened folders",
+    handler: handlers.openRecentFolders,
+  });
 }
 
 /**
@@ -116,6 +124,11 @@ export const COMMAND_METADATA = {
     name: "Open Folder",
     description: "Open a directory to view its contents",
   },
+  OPEN_RECENT_FOLDERS: {
+    id: "open-recent-folders",
+    name: "Open Recent Folders",
+    description: "Show recently opened folders",
+  },
 };
 
 /**
@@ -126,4 +139,5 @@ export function unregisterAppCommands() {
   commandManager.unregister("close-folder");
   commandManager.unregister("close-file");
   commandManager.unregister("open-folder");
+  commandManager.unregister("open-recent-folders");
 }

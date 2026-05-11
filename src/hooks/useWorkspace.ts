@@ -30,18 +30,18 @@ export function useWorkspace(savedState: WorkspaceState | null) {
   const loadDirectory = React.useCallback(
     async (
       path: string,
-      onBeforeLoad?: () => void,
-      onAfterLoad?: () => void
+      onBeforeLoad?: () => void | Promise<void>,
+      onAfterLoad?: () => void | Promise<void>
     ) => {
       const normalizedPath = path.replace(/\\/g, "/");
-      if (onBeforeLoad) onBeforeLoad();
+      if (onBeforeLoad) await onBeforeLoad();
 
       try {
         const result = await invoke<FileEntry[]>("list_directory_contents", {
           path: normalizedPath,
         });
 
-        if (onAfterLoad) onAfterLoad();
+        if (onAfterLoad) await onAfterLoad();
 
         setEntries(
           result.map((e) => ({ ...e, path: e.path.replace(/\\/g, "/") }))

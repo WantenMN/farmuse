@@ -54,8 +54,11 @@ export function TitleBar() {
             >
               Open Folder
             </DropdownMenuItem>
-            <DropdownMenuItem disabled>Recent Folders</DropdownMenuItem>
-            <DropdownMenuItem disabled>Folder Management</DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => commandManager.execute("open-recent-folders")}
+            >
+              Recent Folders
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => commandManager.execute("close-folder")}

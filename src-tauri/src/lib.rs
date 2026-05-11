@@ -364,7 +364,7 @@ async fn initialize_indexer(app: AppHandle, state: tauri::State<'_, IndexerState
 }
 
 #[tauri::command]
-async fn search_markdown_files(state: tauri::State<'_, IndexerState>, query: String) -> Result<Vec<db::MarkdownFile>, String> {
+async fn search_markdown_files(state: tauri::State<'_, IndexerState>, query: String, root_path: Option<String>) -> Result<Vec<db::MarkdownFile>, String> {
     if query.is_empty() {
         return Ok(Vec::new());
     }
@@ -375,7 +375,12 @@ async fn search_markdown_files(state: tauri::State<'_, IndexerState>, query: Str
     };
 
     if let Some(db) = db {
-        let all_files = db.get_all().await?;
+        let all_files = if let Some(root) = root_path {
+            db.get_by_root(&root).await?
+        } else {
+            db.get_all().await?
+        };
+
         use fuzzy_matcher::skim::SkimMatcherV2;
         use fuzzy_matcher::FuzzyMatcher;
         let matcher = SkimMatcherV2::default();
@@ -392,6 +397,19 @@ async fn search_markdown_files(state: tauri::State<'_, IndexerState>, query: Str
         Ok(ranked.into_iter().map(|(_, file)| file).take(50).collect())
     } else {
         Ok(Vec::new())
+    }
+}
+
+#[tauri::command]
+async fn clear_root_index(state: tauri::State<'_, IndexerState>, root_path: String) -> Result<(), String> {
+    let db = {
+        let db_lock = state.db.lock().unwrap();
+        db_lock.clone()
+    };
+    if let Some(db) = db {
+        db.clear_root_index(&root_path).await
+    } else {
+        Ok(())
     }
 }
 
@@ -414,7 +432,8 @@ pub fn run() {
             create_directory,
             list_all_subdirs,
             initialize_indexer,
-            search_markdown_files
+            search_markdown_files,
+            clear_root_index
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
