@@ -264,20 +264,38 @@ function handleImage(
 ): number | null {
   if (node.name !== "Image") return null;
 
-  const sourceMode = state.field(sourceModeImageField);
-  if (sourceMode && node.from >= sourceMode.from && node.to <= sourceMode.to) {
-    return node.to;
-  }
-
-  const isSelected =
-    selection && selection.from <= node.to && selection.to >= node.from;
-
   const fullText = state.doc.sliceString(node.from, node.to);
   const match = fullText.match(/^!\[(.*?)\]\((.*?)\)$/);
   if (!match) return null;
 
   const alt = match[1];
   const url = match[2];
+
+  if (!url || url.trim() === "") return null;
+
+  const sourceMode = state.field(sourceModeImageField);
+  const isEditing =
+    sourceMode && node.from >= sourceMode.from && node.to <= sourceMode.to;
+
+  const isCaretInside =
+    selection &&
+    selection.empty &&
+    selection.from >= node.from &&
+    selection.from < node.to;
+  const isEntirelySelected =
+    selection &&
+    !selection.empty &&
+    selection.from <= node.from &&
+    selection.to >= node.to;
+
+  const shouldShowSource = isEditing || isCaretInside || isEntirelySelected;
+
+  const isSelectedForResize =
+    selection &&
+    ((selection.empty && selection.from === node.to) ||
+      (!selection.empty &&
+        selection.from <= node.from &&
+        selection.to >= node.to));
 
   let width: number | null = null;
   let displayAlt = alt;
@@ -292,6 +310,26 @@ function handleImage(
     displayAlt = "";
   }
 
+  if (shouldShowSource) {
+    builder.add(
+      node.to,
+      node.to,
+      Decoration.widget({
+        widget: new ImageWidget(
+          url,
+          displayAlt,
+          width,
+          node.from,
+          node.to,
+          isSelectedForResize ?? false
+        ),
+        block: true,
+        side: 1,
+      })
+    );
+    return node.to;
+  }
+
   builder.add(
     node.from,
     node.to,
@@ -302,7 +340,7 @@ function handleImage(
         width,
         node.from,
         node.to,
-        isSelected ?? false
+        isSelectedForResize ?? false
       ),
     })
   );

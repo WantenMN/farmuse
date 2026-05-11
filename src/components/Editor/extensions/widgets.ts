@@ -122,7 +122,7 @@ export class ImageWidget extends WidgetType {
       e.preventDefault();
       e.stopPropagation();
       view.dispatch({
-        selection: { anchor: this.from, head: this.to },
+        selection: { anchor: this.to, head: this.to },
       });
     };
 
@@ -138,11 +138,6 @@ export class ImageWidget extends WidgetType {
     container.oncontextmenu = (e) => {
       e.preventDefault();
       e.stopPropagation();
-
-      // Ensure the image is selected when right-clicking to have a consistent state
-      view.dispatch({
-        selection: { anchor: this.from, head: this.to },
-      });
 
       document.querySelectorAll(".cm-image-menu").forEach((el) => el.remove());
 
@@ -238,7 +233,10 @@ export class ImageWidget extends WidgetType {
     const newText = `![${altContent}](${this.url})`;
     view.dispatch({
       changes: { from: this.from, to: this.to, insert: newText },
-      selection: { anchor: this.from, head: this.from + newText.length },
+      selection: {
+        anchor: this.from + newText.length,
+        head: this.from + newText.length,
+      },
     });
   }
 }
