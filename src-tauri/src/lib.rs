@@ -17,6 +17,14 @@ pub struct FileEntry {
     is_dir: bool,
 }
 
+#[derive(Serialize)]
+pub struct FileExplorerEntry {
+    name: String,
+    path: String,
+    is_dir: bool,
+    depth: usize,
+}
+
 pub struct WatcherState(Mutex<Option<notify::RecommendedWatcher>>);
 pub struct ExplorerWatcherState(Mutex<Option<notify::RecommendedWatcher>>);
 
@@ -213,8 +221,27 @@ fn create_directory(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn list_all_subdirs(path: String) -> Result<Vec<String>, String> {
+async fn list_all_subdirs(state: tauri::State<'_, IndexerState>, path: String) -> Result<Vec<String>, String> {
     let resolved_path = resolve_path(&path)?;
+    let path_str = resolved_path.to_string_lossy().to_string();
+
+    let db = {
+        let db_lock = state.db.lock().unwrap();
+        db_lock.clone()
+    };
+
+    if let Some(db) = db {
+        if let Ok(entries) = db.get_entries_by_root(&path_str).await {
+            let dirs = entries.into_iter()
+                .filter(|e| e.is_dir)
+                .map(|e| e.path)
+                .collect::<Vec<_>>();
+            if !dirs.is_empty() {
+                return Ok(dirs);
+            }
+        }
+    }
+    // ... Fallback logic ...
     let mut result = Vec::new();
     let mut stack = vec![resolved_path];
 
@@ -270,30 +297,46 @@ async fn initialize_indexer(app: AppHandle, state: tauri::State<'_, IndexerState
         for entry in WalkDir::new(&resolved_root_clone)
             .into_iter()
             .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file() && e.path().extension().map_or(false, |ext| ext == "md"))
         {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') {
+                continue;
+            }
+
             let path = entry.path().to_string_lossy().to_string();
-            let filename = entry.file_name().to_string_lossy().to_string();
+            if path == root_str_for_indexing {
+                continue;
+            }
+
+            let is_dir = entry.file_type().is_dir();
+            let is_md = entry.file_type().is_file() && entry.path().extension().map_or(false, |ext| ext == "md");
+
+            if !is_dir && !is_md {
+                continue;
+            }
+
+            found_paths.insert(path.clone());
+
             let mtime = entry.metadata().ok().and_then(|m| m.modified().ok())
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|d| d.as_secs() as i64)
                 .unwrap_or(0);
 
-            found_paths.insert(path.clone());
-
-            // Only update if mtime changed or file is new
+            // Only update if mtime changed or entry is new
             if existing_meta.get(&path) != Some(&mtime) {
-                let _ = DbManager::upsert_file_tx(&mut tx, &path, &filename, mtime, &root_str_for_indexing).await;
+                let _ = DbManager::upsert_entry_tx(&mut tx, &path, &name, is_dir, mtime, &root_str_for_indexing).await;
                 updated_count += 1;
             }
 
-            count += 1;
-            if count % 100 == 0 {
-                let _ = app_handle_progress.emit("index-progress", count);
+            if !is_dir {
+                count += 1;
+                if count % 100 == 0 {
+                    let _ = app_handle_progress.emit("index-progress", count);
+                }
             }
         }
 
-        // Remove stale files that were in DB but not found on disk
+        // Remove stale entries
         let _ = DbManager::cleanup_root_stale_tx(&mut tx, &root_str_for_indexing, &found_paths).await;
 
         let _ = tx.commit().await;
@@ -326,18 +369,25 @@ async fn initialize_indexer(app: AppHandle, state: tauri::State<'_, IndexerState
                             EventKind::Create(_) | EventKind::Modify(_) | EventKind::Any => {
                                 for path in event.paths {
                                     if path.exists() {
-                                        if path.is_file() && path.extension().map_or(false, |ext| ext == "md") {
+                                        let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                                        if name.starts_with('.') {
+                                            continue;
+                                        }
+
+                                        let is_dir = path.is_dir();
+                                        let is_md = path.is_file() && path.extension().map_or(false, |ext| ext == "md");
+
+                                        if is_dir || is_md {
                                             let path_str = path.to_string_lossy().to_string();
-                                            let filename = path.file_name().unwrap().to_string_lossy().to_string();
                                             let mtime = path.metadata().ok().and_then(|m| m.modified().ok())
                                                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                                                 .map(|d| d.as_secs() as i64)
                                                 .unwrap_or(0);
-                                            let _ = db.upsert_file(&path_str, &filename, mtime, &root_str_inner).await;
+                                            let _ = db.upsert_entry(&path_str, &name, is_dir, mtime, &root_str_inner).await;
                                         }
                                     } else {
                                         let path_str = path.to_string_lossy().to_string();
-                                        let _ = db.remove_file(&path_str).await;
+                                        let _ = db.remove_entry(&path_str).await;
                                         let _ = db.remove_by_prefix(&path_str).await;
                                     }
                                 }
@@ -345,7 +395,7 @@ async fn initialize_indexer(app: AppHandle, state: tauri::State<'_, IndexerState
                             EventKind::Remove(_) => {
                                 for path in event.paths {
                                     let path_str = path.to_string_lossy().to_string();
-                                    let _ = db.remove_file(&path_str).await;
+                                    let _ = db.remove_entry(&path_str).await;
                                     let _ = db.remove_by_prefix(&path_str).await;
                                 }
                             }
@@ -376,7 +426,7 @@ async fn search_markdown_files(state: tauri::State<'_, IndexerState>, query: Str
 
     if let Some(db) = db {
         let all_files = if let Some(root) = root_path {
-            db.get_by_root(&root).await?
+            db.get_entries_by_root(&root).await?
         } else {
             db.get_all().await?
         };
@@ -387,6 +437,7 @@ async fn search_markdown_files(state: tauri::State<'_, IndexerState>, query: Str
 
         let mut ranked: Vec<(i64, db::MarkdownFile)> = all_files
             .into_iter()
+            .filter(|f| !f.is_dir) // Only search files
             .filter_map(|file| {
                 matcher.fuzzy_match(&file.filename, &query)
                     .map(|score| (score, file))
@@ -413,6 +464,102 @@ async fn clear_root_index(state: tauri::State<'_, IndexerState>, root_path: Stri
     }
 }
 
+#[tauri::command]
+async fn get_explorer_entries(
+    state: tauri::State<'_, IndexerState>,
+    root_path: String,
+    expanded_paths: Option<Vec<String>>,
+    expand_all: Option<bool>,
+) -> Result<Vec<FileExplorerEntry>, String> {
+    let resolved_root = resolve_path(&root_path)?;
+    let root_str = resolved_root.to_string_lossy().to_string();
+    let is_expand_all = expand_all.unwrap_or(false);
+    let expanded_set: HashSet<String> = if is_expand_all {
+        HashSet::new()
+    } else {
+        expanded_paths.unwrap_or_default().into_iter().collect()
+    };
+
+    let db = {
+        let db_lock = state.db.lock().unwrap();
+        db_lock.clone()
+    };
+
+    if let Some(db) = db {
+        let all_entries = db.get_entries_by_root(&root_str).await.unwrap_or_default();
+
+        let mut entries_by_parent: std::collections::HashMap<String, Vec<db::MarkdownFile>> =
+            std::collections::HashMap::new();
+
+        for e in &all_entries {
+            let p = Path::new(&e.path)
+                .parent()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default();
+            entries_by_parent.entry(p).or_default().push(e.clone());
+        }
+
+        let mut result = Vec::with_capacity(all_entries.len());
+
+        fn collect_recursive(
+            current_path: &str,
+            depth: usize,
+            expanded_set: &HashSet<String>,
+            is_expand_all: bool,
+            entries_by_parent: &std::collections::HashMap<String, Vec<db::MarkdownFile>>,
+            result: &mut Vec<FileExplorerEntry>,
+        ) {
+            if let Some(entries) = entries_by_parent.get(current_path) {
+                let mut sorted_entries = entries.clone();
+                sorted_entries.sort_unstable_by(|a, b| {
+                    if a.is_dir != b.is_dir {
+                        b.is_dir.cmp(&a.is_dir)
+                    } else {
+                        a.filename.to_lowercase().cmp(&b.filename.to_lowercase())
+                    }
+                });
+
+                for entry in sorted_entries {
+                    let path_for_result = entry.path.clone();
+                    let is_dir = entry.is_dir;
+                    result.push(FileExplorerEntry {
+                        name: entry.filename,
+                        path: path_for_result.clone(),
+                        is_dir,
+                        depth,
+                    });
+
+                    if is_dir {
+                        let expanded = is_expand_all || expanded_set.contains(&path_for_result) || expanded_set.contains(&path_for_result.replace("\\", "/"));
+                        if expanded {
+                            collect_recursive(
+                                &path_for_result,
+                                depth + 1,
+                                expanded_set,
+                                is_expand_all,
+                                entries_by_parent,
+                                result,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        collect_recursive(
+            &root_str,
+            0,
+            &expanded_set,
+            is_expand_all,
+            &entries_by_parent,
+            &mut result,
+        );
+        return Ok(result);
+    }
+
+    Ok(Vec::new())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -433,7 +580,8 @@ pub fn run() {
             list_all_subdirs,
             initialize_indexer,
             search_markdown_files,
-            clear_root_index
+            clear_root_index,
+            get_explorer_entries
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -28,53 +28,23 @@ export function useFileExplorer(
   }, [expandedPaths]);
 
   const refreshTree = React.useCallback(
-    async (currentExpanded: Set<string>) => {
+    async (currentExpanded: Set<string>, expandAll: boolean = false) => {
       if (!currentPath) return;
 
-      const fetchRecursive = async (
-        path: string,
-        depth: number
-      ): Promise<FileExplorerEntry[]> => {
-        try {
-          const children = await invoke<RawFileEntry[]>(
-            "list_directory_contents",
-            { path }
-          );
-          const result: FileExplorerEntry[] = [];
-          for (const child of children) {
-            const normalizedPath = child.path.replace(/\\/g, "/");
-            const childEntry = { ...child, path: normalizedPath, depth };
-            result.push(childEntry);
-            if (child.is_dir && currentExpanded.has(normalizedPath)) {
-              const descendants = await fetchRecursive(
-                normalizedPath,
-                depth + 1
-              );
-              result.push(...descendants);
-            }
-          }
-          return result;
-        } catch (e) {
-          console.error("Failed to refresh folder", path, e);
-          return [];
-        }
-      };
-
       try {
-        const rootEntriesFetched = await invoke<RawFileEntry[]>(
-          "list_directory_contents",
-          { path: currentPath }
-        );
-        const newEntries: FileExplorerEntry[] = [];
-        for (const rootEntry of rootEntriesFetched) {
-          const normalizedPath = rootEntry.path.replace(/\\/g, "/");
-          newEntries.push({ ...rootEntry, path: normalizedPath, depth: 0 });
-          if (rootEntry.is_dir && currentExpanded.has(normalizedPath)) {
-            const descendants = await fetchRecursive(normalizedPath, 1);
-            newEntries.push(...descendants);
+        const result = await invoke<FileExplorerEntry[]>(
+          "get_explorer_entries",
+          {
+            rootPath: currentPath,
+            expandedPaths: expandAll ? null : Array.from(currentExpanded),
+            expandAll: expandAll,
           }
-        }
-        setEntries(newEntries);
+        );
+        const normalized = result.map((entry) => ({
+          ...entry,
+          path: entry.path.replace(/\\/g, "/"),
+        }));
+        setEntries(normalized);
       } catch (e) {
         console.error("Failed to refresh tree", e);
       }
@@ -213,60 +183,14 @@ export function useFileExplorer(
 
       if (isExpanded) {
         newExpandedPaths.delete(normalizedPath);
-        const newEntries = [...entries];
-        let removeCount = 0;
-        for (let i = index + 1; i < newEntries.length; i++) {
-          if (newEntries[i].depth > entry.depth) {
-            removeCount++;
-          } else {
-            break;
-          }
-        }
-        newEntries.splice(index + 1, removeCount);
-        setEntries(newEntries);
-        setExpandedPaths(newExpandedPaths);
       } else {
         newExpandedPaths.add(normalizedPath);
-
-        const fetchRecursive = async (
-          path: string,
-          depth: number
-        ): Promise<FileExplorerEntry[]> => {
-          const children = await invoke<RawFileEntry[]>(
-            "list_directory_contents",
-            { path }
-          );
-          const result: FileExplorerEntry[] = [];
-          for (const child of children) {
-            const childNormalizedPath = child.path.replace(/\\/g, "/");
-            const childEntry = { ...child, path: childNormalizedPath, depth };
-            result.push(childEntry);
-            if (child.is_dir && newExpandedPaths.has(childNormalizedPath)) {
-              const descendants = await fetchRecursive(
-                childNormalizedPath,
-                depth + 1
-              );
-              result.push(...descendants);
-            }
-          }
-          return result;
-        };
-
-        try {
-          const childrenWithDescendants = await fetchRecursive(
-            normalizedPath,
-            entry.depth + 1
-          );
-          const newEntries = [...entries];
-          newEntries.splice(index + 1, 0, ...childrenWithDescendants);
-          setEntries(newEntries);
-          setExpandedPaths(newExpandedPaths);
-        } catch (e) {
-          console.error("Failed to expand folder", e);
-        }
       }
+
+      setExpandedPaths(newExpandedPaths);
+      await refreshTree(newExpandedPaths);
     },
-    [entries, expandedPaths]
+    [entries, expandedPaths, refreshTree]
   );
 
   return {

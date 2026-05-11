@@ -7,6 +7,7 @@ pub struct MarkdownFile {
     pub id: i64,
     pub path: String,
     pub filename: String,
+    pub is_dir: bool,
 }
 
 #[derive(Clone)]
@@ -26,10 +27,10 @@ impl DbManager {
         let pool = SqlitePool::connect(&conn_str).await.map_err(|e| e.to_string())?;
 
         sqlx::query(
-            "CREATE TABLE IF NOT EXISTS markdown_files (
-                id INTEGER PRIMARY KEY,
-                path TEXT NOT NULL UNIQUE,
-                filename TEXT NOT NULL,
+            "CREATE TABLE IF NOT EXISTS all_entries (
+                path TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                is_dir BOOLEAN NOT NULL,
                 mtime INTEGER NOT NULL,
                 root TEXT NOT NULL
             )"
@@ -38,7 +39,7 @@ impl DbManager {
         .await
         .map_err(|e| e.to_string())?;
 
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_root ON markdown_files(root)")
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_entries_root ON all_entries(root)")
             .execute(&pool)
             .await
             .map_err(|e| e.to_string())?;
@@ -50,14 +51,15 @@ impl DbManager {
         self.pool.begin().await.map_err(|e| e.to_string())
     }
 
-    pub async fn upsert_file_tx(tx: &mut Transaction<'_, Sqlite>, path: &str, filename: &str, mtime: i64, root: &str) -> Result<(), String> {
+    pub async fn upsert_entry_tx(tx: &mut Transaction<'_, Sqlite>, path: &str, name: &str, is_dir: bool, mtime: i64, root: &str) -> Result<(), String> {
         sqlx::query(
-            "INSERT INTO markdown_files (path, filename, mtime, root)
-             VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT(path) DO UPDATE SET filename=?2, mtime=?3, root=?4"
+            "INSERT INTO all_entries (path, name, is_dir, mtime, root)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(path) DO UPDATE SET name=?2, is_dir=?3, mtime=?4, root=?5"
         )
         .bind(path)
-        .bind(filename)
+        .bind(name)
+        .bind(is_dir)
         .bind(mtime)
         .bind(root)
         .execute(&mut **tx)
@@ -66,14 +68,15 @@ impl DbManager {
         Ok(())
     }
 
-    pub async fn upsert_file(&self, path: &str, filename: &str, mtime: i64, root: &str) -> Result<(), String> {
+    pub async fn upsert_entry(&self, path: &str, name: &str, is_dir: bool, mtime: i64, root: &str) -> Result<(), String> {
         sqlx::query(
-            "INSERT INTO markdown_files (path, filename, mtime, root)
-             VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT(path) DO UPDATE SET filename=?2, mtime=?3, root=?4"
+            "INSERT INTO all_entries (path, name, is_dir, mtime, root)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(path) DO UPDATE SET name=?2, is_dir=?3, mtime=?4, root=?5"
         )
         .bind(path)
-        .bind(filename)
+        .bind(name)
+        .bind(is_dir)
         .bind(mtime)
         .bind(root)
         .execute(&self.pool)
@@ -82,8 +85,8 @@ impl DbManager {
         Ok(())
     }
 
-    pub async fn remove_file(&self, path: &str) -> Result<(), String> {
-        sqlx::query("DELETE FROM markdown_files WHERE path = ?1")
+    pub async fn remove_entry(&self, path: &str) -> Result<(), String> {
+        sqlx::query("DELETE FROM all_entries WHERE path = ?1")
             .bind(path)
             .execute(&self.pool)
             .await
@@ -92,7 +95,7 @@ impl DbManager {
     }
 
     pub async fn remove_by_prefix(&self, prefix: &str) -> Result<(), String> {
-        sqlx::query("DELETE FROM markdown_files WHERE path LIKE ?1 || '%'")
+        sqlx::query("DELETE FROM all_entries WHERE path LIKE ?1 || '%'")
             .bind(prefix)
             .execute(&self.pool)
             .await
@@ -101,7 +104,7 @@ impl DbManager {
     }
 
     pub async fn get_metadata_for_root(&self, root: &str) -> Result<std::collections::HashMap<String, i64>, String> {
-        let rows = sqlx::query("SELECT path, mtime FROM markdown_files WHERE root = ?1")
+        let rows = sqlx::query("SELECT path, mtime FROM all_entries WHERE root = ?1")
             .bind(root)
             .fetch_all(&self.pool)
             .await
@@ -119,7 +122,7 @@ impl DbManager {
         root: &str,
         found_paths: &std::collections::HashSet<String>,
     ) -> Result<(), String> {
-        let rows = sqlx::query("SELECT path FROM markdown_files WHERE root = ?1")
+        let rows = sqlx::query("SELECT path FROM all_entries WHERE root = ?1")
             .bind(root)
             .fetch_all(&mut **tx)
             .await
@@ -128,7 +131,7 @@ impl DbManager {
         for row in rows {
             let path: String = row.get(0);
             if !found_paths.contains(&path) {
-                sqlx::query("DELETE FROM markdown_files WHERE path = ?1")
+                sqlx::query("DELETE FROM all_entries WHERE path = ?1")
                     .bind(&path)
                     .execute(&mut **tx)
                     .await
@@ -139,7 +142,7 @@ impl DbManager {
     }
 
     pub async fn clear_root_index(&self, root: &str) -> Result<(), String> {
-        sqlx::query("DELETE FROM markdown_files WHERE root = ?1")
+        sqlx::query("DELETE FROM all_entries WHERE root = ?1")
             .bind(root)
             .execute(&self.pool)
             .await
@@ -147,30 +150,32 @@ impl DbManager {
         Ok(())
     }
 
-    pub async fn get_by_root(&self, root: &str) -> Result<Vec<MarkdownFile>, String> {
-        let rows = sqlx::query("SELECT id, path, filename FROM markdown_files WHERE root = ?1")
+    pub async fn get_entries_by_root(&self, root: &str) -> Result<Vec<MarkdownFile>, String> {
+        let rows = sqlx::query("SELECT path, name, is_dir FROM all_entries WHERE root = ?1")
             .bind(root)
             .fetch_all(&self.pool)
             .await
             .map_err(|e| e.to_string())?;
 
         Ok(rows.into_iter().map(|row| MarkdownFile {
-            id: row.get(0),
-            path: row.get(1),
-            filename: row.get(2),
+            id: 0,
+            path: row.get(0),
+            filename: row.get(1),
+            is_dir: row.get(2),
         }).collect())
     }
 
     pub async fn get_all(&self) -> Result<Vec<MarkdownFile>, String> {
-        let rows = sqlx::query("SELECT id, path, filename FROM markdown_files")
+        let rows = sqlx::query("SELECT path, name, is_dir FROM all_entries")
             .fetch_all(&self.pool)
             .await
             .map_err(|e| e.to_string())?;
 
         Ok(rows.into_iter().map(|row| MarkdownFile {
-            id: row.get(0),
-            path: row.get(1),
-            filename: row.get(2),
+            id: 0,
+            path: row.get(0),
+            filename: row.get(1),
+            is_dir: row.get(2),
         }).collect())
     }
 }

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { commandManager } from "../systems/commandManager";
+import { Virtuoso } from "react-virtuoso";
 
 interface FileExplorerProps {
   currentPath: string | null;
@@ -50,6 +51,7 @@ export function FileExplorer({
   const [isExpanded, setIsExpanded] = React.useState(true);
   const [prevFocusedIndex, setPrevFocusedIndex] = React.useState<number>(-1);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const virtuosoRef = React.useRef(null);
 
   const [isAutoReveal, setIsAutoReveal] = React.useState(() => {
     const saved = localStorage.getItem("explorer_auto_reveal");
@@ -59,6 +61,7 @@ export function FileExplorer({
   React.useEffect(() => {
     localStorage.setItem("explorer_auto_reveal", String(isAutoReveal));
   }, [isAutoReveal]);
+
   const [newItem, setNewItem] = React.useState<{
     type: "file" | "folder";
     parentPath: string;
@@ -127,7 +130,7 @@ export function FileExplorer({
       ? `${parentPath}${fullName}`
       : `${parentPath}/${fullName}`;
 
-    setNewItem(null); // Close input early to avoid double submission
+    setNewItem(null);
     setNewName("");
 
     try {
@@ -143,7 +146,6 @@ export function FileExplorer({
       setExpandedPaths(newExpanded);
 
       if (isFile) {
-        // Open the file. useTabs will handle deduplication if path is same.
         onOpenFile(path, fullName);
         setFocusedPath(path);
       } else {
@@ -197,7 +199,7 @@ export function FileExplorer({
         });
         const newExpanded = new Set(allDirs.map(normalizePath));
         setExpandedPaths(newExpanded);
-        await refreshTree(newExpanded);
+        await refreshTree(newExpanded, true);
       } catch (e) {
         console.error("Failed to expand all", e);
       }
@@ -245,28 +247,17 @@ export function FileExplorer({
   React.useEffect(() => {
     if (
       focusedIndex !== -1 &&
-      scrollContainerRef.current &&
+      virtuosoRef.current &&
       focusedIndex !== prevFocusedIndex
     ) {
-      const index = focusedIndex;
-      const container = scrollContainerRef.current;
-
-      requestAnimationFrame(() => {
-        const list = container.children[0];
-        if (!list || !list.children[index]) return;
-
-        const isMovingDown =
-          prevFocusedIndex === -1 || index > prevFocusedIndex;
-        const targetIndex = isMovingDown
-          ? Math.min(index + 2, entries.length - 1)
-          : Math.max(index - 2, 0);
-
-        const targetElement = list.children[targetIndex] as HTMLElement;
-        if (targetElement) {
-          targetElement.scrollIntoView({ block: "nearest", behavior: "auto" });
-        }
+      // @ts-expect-error virtuoso type issues
+      virtuosoRef.current.scrollIntoView({
+        index: focusedIndex,
+        behavior: "auto",
+        done: () => {
+          setPrevFocusedIndex(focusedIndex);
+        },
       });
-      setPrevFocusedIndex(focusedIndex);
     }
   }, [focusedIndex, entries.length, prevFocusedIndex]);
 
@@ -353,7 +344,7 @@ export function FileExplorer({
       >
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto px-1 outline-none"
+          className="flex-1 overflow-hidden px-1 outline-none"
           tabIndex={0}
           onFocus={() => setIsActive(true)}
           onBlur={() => setIsActive(false)}
@@ -368,9 +359,12 @@ export function FileExplorer({
           ) : entries.length === 0 && !newItem ? (
             <p className="text-muted-foreground p-2 text-xs italic">Empty</p>
           ) : (
-            <div className="space-y-px">
-              {entries.map((entry, index) => (
-                <React.Fragment key={entry.path}>
+            <Virtuoso
+              ref={virtuosoRef}
+              data={entries}
+              className="scrollbar-hide h-full"
+              itemContent={(index, entry) => (
+                <div className="space-y-px">
                   {newItem && newItem.insertIndex === index && (
                     <div
                       className="flex items-center gap-1 py-0.5"
@@ -405,27 +399,29 @@ export function FileExplorer({
                       }
                     }}
                   />
-                </React.Fragment>
-              ))}
-              {newItem && newItem.insertIndex >= entries.length && (
-                <div
-                  className="flex items-center gap-1 py-0.5"
-                  style={{ paddingLeft: `${newItem.depth * 12 + 6}px` }}
-                >
-                  <input
-                    autoFocus
-                    className="bg-background border-primary w-full border px-1 text-sm outline-none"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    onBlur={handleCreateNew}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleCreateNew();
-                      if (e.key === "Escape") setNewItem(null);
-                    }}
-                  />
+                  {newItem &&
+                    newItem.insertIndex === index + 1 &&
+                    index === entries.length - 1 && (
+                      <div
+                        className="flex items-center gap-1 py-0.5"
+                        style={{ paddingLeft: `${newItem.depth * 12 + 6}px` }}
+                      >
+                        <input
+                          autoFocus
+                          className="bg-background border-primary w-full border px-1 text-sm outline-none"
+                          value={newName}
+                          onChange={(e) => setNewName(e.target.value)}
+                          onBlur={handleCreateNew}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleCreateNew();
+                            if (e.key === "Escape") setNewItem(null);
+                          }}
+                        />
+                      </div>
+                    )}
                 </div>
               )}
-            </div>
+            />
           )}
         </div>
       </div>
