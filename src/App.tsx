@@ -3,6 +3,8 @@ import { cn } from "./lib/utils";
 import { TitleBar } from "./components/TitleBar";
 import { ResizeHandles } from "./components/ResizeHandles";
 import { CommandPalette } from "./components/CommandPalette";
+import { QuickOpen } from "./components/QuickOpen";
+import { GlobalStatusBar } from "./components/GlobalStatusBar";
 import { FileExplorer } from "./components/FileExplorer";
 import { SideBar } from "./components/SideBar";
 import { Editor } from "./components/Editor";
@@ -10,6 +12,7 @@ import { SettingsPage } from "./components/SettingsPage";
 import { Tabs } from "./components/Tabs";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { useTabs } from "./hooks/useTabs";
 import { commandManager } from "./systems/commandManager";
@@ -58,7 +61,11 @@ function App() {
 
   const openFile = React.useCallback(
     (path: string, name: string) => {
-      baseOpenFile(path.replace(/\\/g, "/"), name);
+      const normalizedPath = path.replace(/\\/g, "/");
+      baseOpenFile(normalizedPath, name);
+      commandManager.execute("explorer.revealActiveFile", {
+        path: normalizedPath,
+      });
     },
     [baseOpenFile]
   );
@@ -76,7 +83,14 @@ function App() {
         );
       }
 
-      await loadDirectory(normalizedPath, undefined, () => {
+      await loadDirectory(normalizedPath, undefined, async () => {
+        // Initialize indexer for the new folder
+        try {
+          await invoke("initialize_indexer", { rootPath: normalizedPath });
+        } catch (e) {
+          console.error("Failed to initialize indexer", e);
+        }
+
         // If switching folders, load saved state for the new path
         if (normalizedPath !== currentPath) {
           const saved = localStorage.getItem(`tabs_state_${normalizedPath}`);
@@ -251,6 +265,8 @@ function App() {
       </div>
 
       <CommandPalette />
+      <QuickOpen onOpenFile={openFile} />
+      <GlobalStatusBar />
     </div>
   );
 }

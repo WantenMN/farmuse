@@ -7,6 +7,7 @@ import { registerGlobalCommands } from "../commands";
 export function setupSystems() {
   // Global Keybindings
   keyboardManager.bind("alt+x", "open-command-palette");
+  keyboardManager.bind("ctrl+p", "open-quick-open");
   keyboardManager.bind("j", "explorer.moveDown");
   keyboardManager.bind("k", "explorer.moveUp");
   keyboardManager.bind("h", "explorer.collapse");

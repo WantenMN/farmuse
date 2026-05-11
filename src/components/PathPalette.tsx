@@ -7,6 +7,8 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { DialogTitle } from "@/components/ui/dialog";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { commandManager } from "../systems/commandManager";
 import { invoke } from "@tauri-apps/api/core";
 import { Folder, FileText } from "lucide-react";
@@ -181,6 +183,9 @@ export function PathPalette({
         onValueChange: setSelectedValue,
       }}
     >
+      <VisuallyHidden.Root>
+        <DialogTitle>{commandName}</DialogTitle>
+      </VisuallyHidden.Root>
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
         <CommandGroup

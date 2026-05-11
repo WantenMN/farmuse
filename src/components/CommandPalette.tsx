@@ -7,6 +7,8 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { DialogTitle } from "@/components/ui/dialog";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { commandManager } from "../systems/commandManager";
 import { fuzzyFilter } from "@/lib/search";
 
@@ -80,6 +82,9 @@ export function CommandPalette() {
         onValueChange: setSelectedId,
       }}
     >
+      <VisuallyHidden.Root>
+        <DialogTitle>Command Palette</DialogTitle>
+      </VisuallyHidden.Root>
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
         <CommandGroup heading="Commands">
