@@ -37,6 +37,7 @@ export function Editor({ path, name }: EditorProps) {
     container: editorRef,
     value: content || "",
     extensions,
+    autoFocus: true,
   });
 
   if (!path) return <EditorEmptyState />;
