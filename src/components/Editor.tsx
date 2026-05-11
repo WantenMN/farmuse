@@ -18,6 +18,7 @@ export function Editor({ path, name, isActive = false }: EditorProps) {
   const { content, setContent, error, loading, isSaving, lastSavedContent } =
     useEditor({ path, name });
   const fontSize = useSettingsStore((state) => state.fontSize);
+  const showLineNumbers = useSettingsStore((state) => state.showLineNumbers);
 
   const [mode, setMode] = React.useState<EditorMode>("live");
   const editorRef = React.useRef<HTMLDivElement>(null);
@@ -30,9 +31,10 @@ export function Editor({ path, name, isActive = false }: EditorProps) {
         setContent(newContent);
       },
       mode,
-      fontSize
+      fontSize,
+      showLineNumbers
     );
-  }, [setContent, mode, fontSize, hasContent]);
+  }, [setContent, mode, fontSize, showLineNumbers, hasContent]);
 
   useCodeMirror({
     container: editorRef,

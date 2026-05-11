@@ -30,10 +30,10 @@ export { getEditorTheme, markdownHighlightStyle };
 export const getDefaultExtensions = (
   onDocChange: (newContent: string, view: EditorView) => void,
   mode: "source" | "live" = "source",
-  fontSize: number = 18
+  fontSize: number = 18,
+  showLineNumbers: boolean = true
 ) => {
   const extensions = [
-    lineNumbers(),
     history(),
     foldGutter({
       markerDOM: (open) => {
@@ -74,6 +74,10 @@ export const getDefaultExtensions = (
     hoverPlugin,
     gutterHoverPlugin,
   ];
+
+  if (showLineNumbers) {
+    extensions.push(lineNumbers());
+  }
 
   if (mode === "live") {
     extensions.push(livePreviewPlugin);
