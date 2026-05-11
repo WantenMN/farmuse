@@ -1,20 +1,25 @@
 import * as React from "react";
-import { Folder, Trash2 } from "lucide-react";
+import { Folder, Trash2, Check, Plus } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 
 interface RecentFoldersPageProps {
   onOpenFolder: (path: string) => void;
+  onNewFolder: () => void;
   currentPath: string | null;
   onRemoveFolder: (path: string) => void;
 }
 
 export function RecentFoldersPage({
   onOpenFolder,
+  onNewFolder,
   currentPath,
   onRemoveFolder,
 }: RecentFoldersPageProps) {
   const [folders, setFolders] = React.useState<string[]>([]);
+  const [confirmingPath, setConfirmingPath] = React.useState<string | null>(
+    null
+  );
 
   const loadFolders = React.useCallback((isInitial = false) => {
     const saved = JSON.parse(
@@ -50,6 +55,11 @@ export function RecentFoldersPage({
   const handleRemove = async (e: React.MouseEvent, path: string) => {
     e.stopPropagation();
 
+    if (confirmingPath !== path) {
+      setConfirmingPath(path);
+      return;
+    }
+
     // 1. Remove from database index
     try {
       await invoke("clear_root_index", { rootPath: path });
@@ -72,27 +82,58 @@ export function RecentFoldersPage({
 
     // 4. Call parent handler to close if currently open
     onRemoveFolder(path);
+    setConfirmingPath(null);
   };
+
+  // Reset confirmation state when clicking elsewhere
+  React.useEffect(() => {
+    const handleClickOutside = () => setConfirmingPath(null);
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, []);
 
   return (
     <div className="bg-background flex-1 overflow-auto p-8">
       <div className="mx-auto max-w-4xl">
-        <h1 className="mb-8 text-3xl font-bold">Recent Folders</h1>
+        <div className="mb-8 flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Recent Folders</h1>
+          <button
+            onClick={onNewFolder}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 flex cursor-pointer items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Open Folder
+          </button>
+        </div>
 
         {folders.length === 0 ? (
           <div className="bg-muted/30 flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 text-center">
             <Folder className="text-muted-foreground mb-4 h-12 w-12 opacity-20" />
-            <p className="text-muted-foreground">No recent folders found.</p>
+            <p className="text-muted-foreground mb-4">
+              No recent folders found.
+            </p>
+            <button
+              onClick={onNewFolder}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 flex cursor-pointer items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Open Your First Folder
+            </button>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {folders.map((path) => (
               <div
                 key={path}
-                onClick={() => onOpenFolder(path)}
+                onClick={() => {
+                  if (confirmingPath === path) return;
+                  onOpenFolder(path);
+                }}
                 className={cn(
                   "group bg-muted/30 border-border hover:border-primary relative flex cursor-pointer flex-col rounded-lg border p-4 transition-all hover:shadow-md",
-                  currentPath === path && "ring-primary ring-2"
+                  currentPath === path && "ring-primary ring-2",
+                  confirmingPath === path &&
+                    "border-destructive ring-destructive/50 ring-2"
                 )}
               >
                 <div className="mb-2 flex items-start justify-between">
@@ -113,10 +154,23 @@ export function RecentFoldersPage({
                   </div>
                   <button
                     onClick={(e) => handleRemove(e, path)}
-                    className="hover:bg-destructive hover:text-destructive-foreground text-muted-foreground rounded p-1.5 opacity-0 transition-colors group-hover:opacity-100"
-                    title="Remove and clear data"
+                    className={cn(
+                      "cursor-pointer rounded p-1.5 transition-all",
+                      confirmingPath === path
+                        ? "bg-destructive text-destructive-foreground opacity-100"
+                        : "text-muted-foreground hover:bg-destructive hover:text-destructive-foreground opacity-0 group-hover:opacity-100"
+                    )}
+                    title={
+                      confirmingPath === path
+                        ? "Confirm removal"
+                        : "Remove from recent"
+                    }
                   >
-                    <Trash2 className="h-4 w-4" />
+                    {confirmingPath === path ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
                 <div className="min-w-0 flex-1">

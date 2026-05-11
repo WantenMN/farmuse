@@ -74,8 +74,12 @@ function App() {
   const hasRestoredEntries = React.useRef(false);
 
   const handleLoadDirectory = React.useCallback(
-    async (path: string, _shouldFocus = true) => {
+    async (path: string, force = false) => {
       const normalizedPath = path.replace(/\\/g, "/");
+
+      if (normalizedPath === currentPath && !force) {
+        return;
+      }
 
       // Save current state before switching
       if (currentPath && currentPath !== normalizedPath) {
@@ -87,6 +91,7 @@ function App() {
 
       await loadDirectory(normalizedPath, undefined, async () => {
         // Handle tab switching and restoration
+        // Only restore if we are actually switching folders
         if (normalizedPath !== currentPath) {
           const saved = localStorage.getItem(`tabs_state_${normalizedPath}`);
           let restoredFiles: { path: string; name: string }[] = [];
@@ -158,7 +163,7 @@ function App() {
   React.useEffect(() => {
     if (currentPath && !hasRestoredEntries.current) {
       hasRestoredEntries.current = true;
-      handleLoadDirectory(currentPath, false);
+      handleLoadDirectory(currentPath, true);
     }
   }, [currentPath, handleLoadDirectory]);
 
@@ -174,19 +179,35 @@ function App() {
     localStorage.setItem("farmuse_state", JSON.stringify(state));
 
     if (currentPath) {
-      localStorage.setItem(
-        `tabs_state_${currentPath}`,
-        JSON.stringify({ openFiles, activeFilePath })
+      const isConsistent = openFiles.every(
+        (f) =>
+          f.path.includes("://") ||
+          f.path.startsWith(currentPath + "/") ||
+          f.path === currentPath
       );
+      if (isConsistent) {
+        localStorage.setItem(
+          `tabs_state_${currentPath}`,
+          JSON.stringify({ openFiles, activeFilePath })
+        );
+      }
     }
   }, [currentPath, openFiles, activeFilePath, showExplorer, explorerWidth]);
 
   const closeFolder = React.useCallback(() => {
     if (currentPath) {
-      localStorage.setItem(
-        `tabs_state_${currentPath}`,
-        JSON.stringify({ openFiles, activeFilePath })
+      const isConsistent = openFiles.every(
+        (f) =>
+          f.path.includes("://") ||
+          f.path.startsWith(currentPath + "/") ||
+          f.path === currentPath
       );
+      if (isConsistent) {
+        localStorage.setItem(
+          `tabs_state_${currentPath}`,
+          JSON.stringify({ openFiles, activeFilePath })
+        );
+      }
     }
     closeWorkspaceFolder();
     clearTabs();
@@ -289,11 +310,14 @@ function App() {
                 ) : file.path === "recent-folders://" ? (
                   <RecentFoldersPage
                     onOpenFolder={handleLoadDirectory}
+                    onNewFolder={openFolder}
                     currentPath={currentPath}
                     onRemoveFolder={(path) => {
                       if (currentPath === path) {
                         closeWorkspaceFolder();
-                        clearTabs();
+                        setOpenFiles((prev) =>
+                          prev.filter((f) => f.path.includes("://"))
+                        );
                       }
                     }}
                   />

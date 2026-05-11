@@ -41,13 +41,13 @@ export function useWorkspace(savedState: WorkspaceState | null) {
           path: normalizedPath,
         });
 
-        if (onAfterLoad) await onAfterLoad();
-
         setEntries(
           result.map((e) => ({ ...e, path: e.path.replace(/\\/g, "/") }))
         );
         setCurrentPath(normalizedPath);
         setShowExplorer(true);
+
+        if (onAfterLoad) await onAfterLoad();
 
         // Focus the explorer after a short delay
         setTimeout(() => {
