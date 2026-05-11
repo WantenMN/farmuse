@@ -161,14 +161,21 @@ export function useFileExplorer(
 
   // Listen for refresh events
   React.useEffect(() => {
-    const unlistenPromise = listen<string>("explorer-refresh", (_event) => {
+    const unlistenRefresh = listen<string>("explorer-refresh", (_event) => {
+      if (currentPath) {
+        refreshTree(expandedPathsRef.current);
+      }
+    });
+
+    const unlistenIndex = listen("index-updated", () => {
       if (currentPath) {
         refreshTree(expandedPathsRef.current);
       }
     });
 
     return () => {
-      unlistenPromise.then((unlisten) => unlisten());
+      unlistenRefresh.then((unlisten) => unlisten());
+      unlistenIndex.then((unlisten) => unlisten());
     };
   }, [currentPath, refreshTree]);
 

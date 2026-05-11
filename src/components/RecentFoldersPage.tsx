@@ -69,6 +69,7 @@ export function RecentFoldersPage({
 
     // 2. Clear localStorage state for this folder
     localStorage.removeItem(`tabs_state_${path}`);
+    localStorage.removeItem(`explorer_state_${path}`);
 
     // 3. Update recent folders list
     const saved = JSON.parse(
