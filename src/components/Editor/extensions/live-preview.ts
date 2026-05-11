@@ -79,7 +79,8 @@ const pointerInteractionPlugin = ViewPlugin.fromClass(
 
           // Handle clicks on empty space around rendered content
           // We allow a tiny tolerance (2 chars) for accidental micro-drags during click
-          const isCheckableAsClick = sel.empty || Math.abs(sel.to - sel.from) <= 2;
+          const isCheckableAsClick =
+            sel.empty || Math.abs(sel.to - sel.from) <= 2;
 
           if (e instanceof MouseEvent && isCheckableAsClick) {
             const pos = sel.from;
@@ -114,7 +115,7 @@ const pointerInteractionPlugin = ViewPlugin.fromClass(
 
           // If we didn't jump to end/start, and we have a real selection, do snapping
           if (newSel.empty && !sel.empty && !isCheckableAsClick) {
-             // Skip snap if we already decided to cursor-jump
+            // Skip snap if we already decided to cursor-jump
           } else if (!newSel.empty) {
             // Snap selection to hidden markers for links, images, and formatting
             syntaxTree(view.state).iterate({
@@ -153,7 +154,8 @@ const pointerInteractionPlugin = ViewPlugin.fromClass(
                     const marks = children.filter((c) =>
                       c.name.endsWith("Mark")
                     );
-                    if (marks.length >= 2) snapEndMark = marks[marks.length - 1];
+                    if (marks.length >= 2)
+                      snapEndMark = marks[marks.length - 1];
                   }
 
                   if (firstMark && snapEndMark) {

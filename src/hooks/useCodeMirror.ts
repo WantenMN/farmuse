@@ -44,6 +44,13 @@ export function useCodeMirror({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extensions]);
 
+  // Focus when autoFocus becomes true
+  React.useEffect(() => {
+    if (autoFocus && view) {
+      view.focus();
+    }
+  }, [autoFocus, view]);
+
   // Sync value from outside to editor
   React.useEffect(() => {
     if (view && value !== null) {

@@ -11,9 +11,10 @@ import { getDefaultExtensions } from "./Editor/CodeMirrorConfig";
 interface EditorProps {
   path: string | null;
   name: string | null;
+  isActive?: boolean;
 }
 
-export function Editor({ path, name }: EditorProps) {
+export function Editor({ path, name, isActive = false }: EditorProps) {
   const { content, setContent, error, loading, isSaving, lastSavedContent } =
     useEditor({ path, name });
   const fontSize = useSettingsStore((state) => state.fontSize);
@@ -37,7 +38,7 @@ export function Editor({ path, name }: EditorProps) {
     container: editorRef,
     value: content || "",
     extensions,
-    autoFocus: true,
+    autoFocus: isActive,
   });
 
   if (!path) return <EditorEmptyState />;

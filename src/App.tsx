@@ -1,4 +1,5 @@
 import * as React from "react";
+import { cn } from "./lib/utils";
 import { TitleBar } from "./components/TitleBar";
 import { ResizeHandles } from "./components/ResizeHandles";
 import { CommandPalette } from "./components/CommandPalette";
@@ -46,7 +47,6 @@ function App() {
     setOpenFiles,
     activeFilePath,
     setActiveFilePath,
-    activeFile,
     openFile,
     closeFile,
     closeOthers,
@@ -181,16 +181,26 @@ function App() {
             />
           )}
 
-          {activeFile ? (
-            activeFile.path === "settings://" ? (
-              <SettingsPage />
-            ) : (
-              <Editor
-                key={activeFile.path}
-                path={activeFile.path}
-                name={activeFile.name}
-              />
-            )
+          {openFiles.length > 0 ? (
+            openFiles.map((file) => (
+              <div
+                key={file.path}
+                className={cn(
+                  "flex min-h-0 flex-1 flex-col",
+                  file.path !== activeFilePath && "hidden"
+                )}
+              >
+                {file.path === "settings://" ? (
+                  <SettingsPage />
+                ) : (
+                  <Editor
+                    path={file.path}
+                    name={file.name}
+                    isActive={file.path === activeFilePath}
+                  />
+                )}
+              </div>
+            ))
           ) : (
             <WelcomeScreen currentPath={currentPath} />
           )}
