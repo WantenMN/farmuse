@@ -53,7 +53,6 @@ export const getDefaultExtensions = (
     indentOnInput(),
     syntaxHighlighting(markdownHighlightStyle),
     syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-    bracketMatching(),
     closeBrackets(),
     highlightActiveLine(),
     keymap.of([...defaultKeymap, ...historyKeymap]),
