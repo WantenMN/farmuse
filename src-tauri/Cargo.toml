@@ -27,4 +27,6 @@ notify = "6.1.1"
 sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite"] }
 walkdir = "2"
 fuzzy-matcher = "0.3"
+trash = "5.2.6"
+tauri-plugin-clipboard-manager = "2.3.2"
 

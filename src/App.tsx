@@ -53,6 +53,7 @@ function App() {
     closeOthers,
     closeAll,
     clearTabs,
+    updatePaths,
   } = useTabs(savedState);
 
   const activeFilePath = React.useMemo(
@@ -270,7 +271,10 @@ function App() {
           width={explorerWidth}
           onResizeStart={startResizing}
           onOpenFile={openFile}
+          onFileDeleted={closeFile}
+          onFileMoved={updatePaths}
           activeFilePath={activeFilePath}
+          onCloseFolder={closeFolder}
         />
 
         <main className="flex min-w-0 flex-1 flex-col">
@@ -300,6 +304,7 @@ function App() {
                   file.path !== activeFilePath && "hidden"
                 )}
                 onMouseDownCapture={() => {
+                  // Only reveal, don't necessarily focus editor
                   commandManager.execute("explorer.revealActiveFile", {
                     path: file.path,
                   });

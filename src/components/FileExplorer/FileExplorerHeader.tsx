@@ -5,6 +5,8 @@ interface FileExplorerHeaderProps {
   isExpanded: boolean;
   onToggle: () => void;
   children?: React.ReactNode;
+  onContextMenu?: (e: React.MouseEvent) => void;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
 export function FileExplorerHeader({
@@ -12,11 +14,17 @@ export function FileExplorerHeader({
   isExpanded,
   onToggle,
   children,
+  onContextMenu,
+  onClick,
 }: FileExplorerHeaderProps) {
   return (
     <div
       className="hover:bg-accent/30 text-muted-foreground group/header flex h-8 cursor-pointer items-center gap-1 px-1 transition-colors select-none"
-      onClick={onToggle}
+      onClick={(e) => {
+        onToggle();
+        onClick?.(e);
+      }}
+      onContextMenu={onContextMenu}
     >
       <div className="flex w-4 items-center justify-center">
         {isExpanded ? (

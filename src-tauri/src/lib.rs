@@ -221,6 +221,87 @@ fn create_directory(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn rename_item(at: String, new_name: String) -> Result<String, String> {
+    let resolved_at = resolve_path(&at)?;
+    let parent = resolved_at.parent().ok_or("Could not find parent directory")?;
+    let new_path = parent.join(new_name);
+    fs::rename(&resolved_at, &new_path).map_err(|e| e.to_string())?;
+    Ok(new_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn remove_to_trash(path: String) -> Result<(), String> {
+    let resolved_path = resolve_path(&path)?;
+    trash::delete(resolved_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn duplicate_item(path: String) -> Result<String, String> {
+    let resolved_path = resolve_path(&path)?;
+    let parent = resolved_path.parent().ok_or("Could not find parent directory")?;
+    let file_name = resolved_path.file_name().ok_or("Invalid file name")?.to_string_lossy();
+    let is_dir = resolved_path.is_dir();
+
+    let (stem, ext) = if is_dir {
+        (file_name.to_string(), String::new())
+    } else {
+        let p = Path::new(file_name.as_ref());
+        (
+            p.file_stem().unwrap_or_default().to_string_lossy().to_string(),
+            p.extension()
+                .and_then(|e| e.to_str())
+                .map(|e| format!(".{}", e))
+                .unwrap_or_default(),
+        )
+    };
+
+    let mut count = 1;
+    let mut new_path = parent.join(format!("{} Copy {}{}", stem, count, ext));
+
+    while new_path.exists() {
+        count += 1;
+        new_path = parent.join(format!("{} Copy {}{}", stem, count, ext));
+    }
+
+    if is_dir {
+        copy_dir_recursive(&resolved_path, &new_path).map_err(|e| e.to_string())?;
+    } else {
+        fs::copy(&resolved_path, &new_path).map_err(|e| e.to_string())?;
+    }
+
+    Ok(new_path.to_string_lossy().to_string())
+}
+
+fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_recursive(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            fs::copy(entry.path(), dst.join(entry.file_name()))?;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn move_item(at: String, to_dir: String) -> Result<String, String> {
+    let resolved_at = resolve_path(&at)?;
+    let resolved_to_dir = resolve_path(&to_dir)?;
+    let file_name = resolved_at.file_name().ok_or("Invalid file name")?;
+    let new_path = resolved_to_dir.join(file_name);
+
+    if new_path.exists() {
+        return Err("A file with the same name already exists in the destination".to_string());
+    }
+
+    fs::rename(&resolved_at, &new_path).map_err(|e| e.to_string())?;
+    Ok(new_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 async fn list_all_subdirs(state: tauri::State<'_, IndexerState>, path: String) -> Result<Vec<String>, String> {
     let resolved_path = resolve_path(&path)?;
     let path_str = resolved_path.to_string_lossy().to_string();
@@ -568,6 +649,7 @@ pub fn run() {
         .manage(IndexerState::new())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
             list_directory_contents,
             list_subdirs,
@@ -581,7 +663,11 @@ pub fn run() {
             initialize_indexer,
             search_markdown_files,
             clear_root_index,
-            get_explorer_entries
+            get_explorer_entries,
+            rename_item,
+            remove_to_trash,
+            duplicate_item,
+            move_item
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -13,6 +13,10 @@ interface UseFileExplorerCommandsProps {
   toggleFolder: (index: number) => Promise<void>;
   scrollContainerRef: React.RefObject<HTMLDivElement>;
   onOpenFile: (path: string, name: string) => void;
+  onRename?: () => void;
+  onDelete?: () => void;
+  onCut?: () => void;
+  onPaste?: () => void;
 }
 
 export function useFileExplorerCommands({
@@ -26,7 +30,46 @@ export function useFileExplorerCommands({
   toggleFolder,
   scrollContainerRef,
   onOpenFile,
+  onRename,
+  onDelete,
+  onCut,
+  onPaste,
 }: UseFileExplorerCommandsProps) {
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isActive) return;
+
+      // Ignore if editing an input or textarea
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target as HTMLElement).isContentEditable
+      )
+        return;
+
+      if (e.key === "F2") {
+        e.preventDefault();
+        onRename?.();
+      } else if (e.key === "Delete") {
+        e.preventDefault();
+        onDelete?.();
+      } else if (e.key === "x" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        onCut?.();
+      } else if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
+        // User asked for "Ctrl C cut" specifically
+        e.preventDefault();
+        onCut?.();
+      } else if (e.key === "v" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        onPaste?.();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isActive, onRename, onDelete, onCut, onPaste]);
+
   React.useEffect(() => {
     commandManager.register({
       id: "explorer.focus",

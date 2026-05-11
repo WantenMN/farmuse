@@ -15,7 +15,7 @@ interface EditorProps {
   isActive?: boolean;
 }
 
-export function Editor({ path, name, isActive = false }: EditorProps) {
+export function Editor({ path, name, isActive: _isActive = false }: EditorProps) {
   const { content, setContent, error, loading, isSaving, lastSavedContent } =
     useEditor({ path, name });
   const fontSize = useSettingsStore((state) => state.fontSize);
@@ -39,7 +39,7 @@ export function Editor({ path, name, isActive = false }: EditorProps) {
     container: editorRef,
     value: content || "",
     extensions,
-    autoFocus: isActive,
+    autoFocus: false, // Don't steal focus on mount
   });
 
   if (!path) return <EditorEmptyState />;
