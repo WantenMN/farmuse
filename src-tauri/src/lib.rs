@@ -287,6 +287,29 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 }
 
 #[tauri::command]
+fn copy_item(at: String, to_dir: String) -> Result<String, String> {
+    let resolved_at = resolve_path(&at)?;
+    let resolved_to_dir = resolve_path(&to_dir)?;
+    let file_name = resolved_at.file_name().ok_or("Invalid file name")?;
+    let new_path = resolved_to_dir.join(file_name);
+
+    if new_path.exists() {
+        if resolved_at.parent() == Some(&resolved_to_dir) {
+            return duplicate_item(at);
+        }
+        return Err("A file with the same name already exists in the destination".to_string());
+    }
+
+    let is_dir = resolved_at.is_dir();
+    if is_dir {
+        copy_dir_recursive(&resolved_at, &new_path).map_err(|e| e.to_string())?;
+    } else {
+        fs::copy(&resolved_at, &new_path).map_err(|e| e.to_string())?;
+    }
+    Ok(new_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 fn move_item(at: String, to_dir: String) -> Result<String, String> {
     let resolved_at = resolve_path(&at)?;
     let resolved_to_dir = resolve_path(&to_dir)?;
@@ -667,6 +690,7 @@ pub fn run() {
             rename_item,
             remove_to_trash,
             duplicate_item,
+            copy_item,
             move_item
         ])
         .run(tauri::generate_context!())

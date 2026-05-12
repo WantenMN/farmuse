@@ -99,7 +99,9 @@ export function useTabs(initialState: TabsState | null) {
         }
         if (normalizedFilePath.startsWith(normalizedOld + "/")) {
           changed = true;
-          const relativePart = normalizedFilePath.substring(normalizedOld.length);
+          const relativePart = normalizedFilePath.substring(
+            normalizedOld.length
+          );
           return { ...f, path: normalizedNew + relativePart };
         }
         return f;
@@ -131,7 +133,8 @@ export function useTabs(initialState: TabsState | null) {
     (updater: TabFile[] | ((prev: TabFile[]) => TabFile[])) => {
       setState((prev) => ({
         ...prev,
-        openFiles: typeof updater === "function" ? updater(prev.openFiles) : updater,
+        openFiles:
+          typeof updater === "function" ? updater(prev.openFiles) : updater,
       }));
     },
     []
@@ -142,7 +145,9 @@ export function useTabs(initialState: TabsState | null) {
       setState((prev) => ({
         ...prev,
         activeFilePath:
-          typeof updater === "function" ? updater(prev.activeFilePath) : updater,
+          typeof updater === "function"
+            ? updater(prev.activeFilePath)
+            : updater,
       }));
     },
     []

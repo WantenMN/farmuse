@@ -15,7 +15,11 @@ interface EditorProps {
   isActive?: boolean;
 }
 
-export function Editor({ path, name, isActive: _isActive = false }: EditorProps) {
+export function Editor({
+  path,
+  name,
+  isActive: _isActive = false,
+}: EditorProps) {
   const { content, setContent, error, loading, isSaving, lastSavedContent } =
     useEditor({ path, name });
   const fontSize = useSettingsStore((state) => state.fontSize);

@@ -128,7 +128,7 @@ export function FileExplorer({
     setExpandedPaths,
   } = useFileExplorer(currentPath, rootEntries);
 
-  const { cutPath, setCutPath } = useFileStore();
+  const { cutPath, setCutPath, copyPath, setCopyPath } = useFileStore();
   const [isExpanded, setIsExpanded] = React.useState(true);
   const [prevFocusedIndex, setPrevFocusedIndex] = React.useState<number>(-1);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -338,22 +338,49 @@ export function FileExplorer({
   };
 
   const handlePaste = async (targetDir: string) => {
-    if (!cutPath) return;
-    try {
-      const resultPath = await invoke<string>("move_item", {
-        at: cutPath,
-        toDir: targetDir,
-      });
-      onFileMoved?.(cutPath, resultPath);
-      setCutPath(null);
-      await refreshTree(expandedPaths);
-      setFocusedPath(resultPath);
-    } catch (e) {
-      console.error("Failed to paste", e);
+    if (cutPath) {
+      const normalizedCutPath = normalizePath(cutPath);
+      const normalizedTargetDir = normalizePath(targetDir);
+      const lastSlash = normalizedCutPath.lastIndexOf("/");
+      const cutPathDir =
+        lastSlash !== -1 ? normalizedCutPath.substring(0, lastSlash) : "";
+
+      // If same directory or same item, do nothing
+      if (
+        normalizedCutPath === normalizedTargetDir ||
+        cutPathDir === normalizedTargetDir
+      ) {
+        setCutPath(null);
+        return;
+      }
+
+      try {
+        const resultPath = await invoke<string>("move_item", {
+          at: cutPath,
+          toDir: targetDir,
+        });
+        onFileMoved?.(cutPath, resultPath);
+        setCutPath(null);
+        await refreshTree(expandedPaths);
+        setFocusedPath(resultPath);
+      } catch (e) {
+        console.error("Failed to paste", e);
+      }
+    } else if (copyPath) {
+      try {
+        const resultPath = await invoke<string>("copy_item", {
+          at: copyPath,
+          toDir: targetDir,
+        });
+        await refreshTree(expandedPaths);
+        setFocusedPath(resultPath);
+      } catch (e) {
+        console.error("Failed to copy", e);
+      }
     }
   };
 
-  const copyPath = async (path: string, relative: boolean) => {
+  const handleCopyPath = async (path: string, relative: boolean) => {
     let textToCopy = path;
     if (relative && currentPath) {
       const normalizedRoot = normalizePath(currentPath);
@@ -433,6 +460,11 @@ export function FileExplorer({
         setCutPath(entries[focusedIndex].path);
       }
     },
+    onCopy: () => {
+      if (focusedIndex !== -1) {
+        setCopyPath(entries[focusedIndex].path);
+      }
+    },
     onPaste: () => {
       const entry = focusedIndex !== -1 ? entries[focusedIndex] : undefined;
       const targetDir =
@@ -481,7 +513,7 @@ export function FileExplorer({
   const renderContextMenuContent = (entry?: FileExplorerEntry) => {
     const isFolder = entry && entry.is_dir;
     const isEmpty = !entry;
-    const hasPaste = !!(cutPath && (isFolder || isEmpty));
+    const hasPaste = !!((cutPath || copyPath) && (isFolder || isEmpty));
 
     // Groups are rendered only if they have content.
     // Separators are rendered only if there's content before them.
@@ -533,13 +565,15 @@ export function FileExplorer({
     items.push(
       <ContextMenuGroup key="paths">
         <ContextMenuItem
-          onClick={() => copyPath(entry?.path || currentPath || "", true)}
+          onClick={() => handleCopyPath(entry?.path || currentPath || "", true)}
         >
           <FileCode className="mr-2 h-4 w-4" />
           Copy Relative Path
         </ContextMenuItem>
         <ContextMenuItem
-          onClick={() => copyPath(entry?.path || currentPath || "", false)}
+          onClick={() =>
+            handleCopyPath(entry?.path || currentPath || "", false)
+          }
         >
           <FolderTree className="mr-2 h-4 w-4" />
           Copy Absolute Path
@@ -553,16 +587,22 @@ export function FileExplorer({
       </ContextMenuGroup>
     );
 
-    // Group 4: Cut/Paste
+    // Group 4: Cut/Copy/Paste
     if (entry || hasPaste) {
       if (items.length > 0) items.push(<ContextMenuSeparator key="sep3" />);
       items.push(
         <ContextMenuGroup key="clipboard">
           {entry && (
-            <ContextMenuItem onClick={() => setCutPath(entry.path)}>
-              <Scissors className="mr-2 h-4 w-4" />
-              Cut
-            </ContextMenuItem>
+            <>
+              <ContextMenuItem onClick={() => setCopyPath(entry.path)}>
+                <Copy className="mr-2 h-4 w-4" />
+                Copy
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => setCutPath(entry.path)}>
+                <Scissors className="mr-2 h-4 w-4" />
+                Cut
+              </ContextMenuItem>
+            </>
           )}
           {hasPaste && (
             <ContextMenuItem
@@ -736,7 +776,7 @@ export function FileExplorer({
                     <Virtuoso
                       ref={virtuosoRef}
                       data={entries}
-                      className="scrollbar-hide h-full virtuoso-scroller"
+                      className="scrollbar-hide virtuoso-scroller h-full"
                       itemContent={(index, entry) => (
                         <div className="space-y-px">
                           {newItem && newItem.insertIndex === index && (

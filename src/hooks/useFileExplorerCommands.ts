@@ -15,6 +15,7 @@ interface UseFileExplorerCommandsProps {
   onOpenFile: (path: string, name: string) => void;
   onRename?: () => void;
   onDelete?: () => void;
+  onCopy?: () => void;
   onCut?: () => void;
   onPaste?: () => void;
 }
@@ -32,6 +33,7 @@ export function useFileExplorerCommands({
   onOpenFile,
   onRename,
   onDelete,
+  onCopy,
   onCut,
   onPaste,
 }: UseFileExplorerCommandsProps) {
@@ -57,9 +59,8 @@ export function useFileExplorerCommands({
         e.preventDefault();
         onCut?.();
       } else if (e.key === "c" && (e.ctrlKey || e.metaKey)) {
-        // User asked for "Ctrl C cut" specifically
         e.preventDefault();
-        onCut?.();
+        onCopy?.();
       } else if (e.key === "v" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         onPaste?.();
@@ -68,7 +69,7 @@ export function useFileExplorerCommands({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isActive, onRename, onDelete, onCut, onPaste]);
+  }, [isActive, onRename, onDelete, onCopy, onCut, onPaste]);
 
   React.useEffect(() => {
     commandManager.register({
