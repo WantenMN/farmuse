@@ -19,7 +19,7 @@ export function FileExplorerHeader({
 }: FileExplorerHeaderProps) {
   return (
     <div
-      className="hover:bg-accent/30 text-muted-foreground group/header flex h-8 cursor-pointer items-center gap-1 px-1 transition-colors select-none"
+      className="text-muted-foreground group/header flex h-8 cursor-pointer items-center gap-1 px-1 select-none"
       onClick={(e) => {
         onToggle();
         onClick?.(e);
@@ -28,9 +28,9 @@ export function FileExplorerHeader({
     >
       <div className="flex w-4 items-center justify-center">
         {isExpanded ? (
-          <ChevronDown className="h-3.5 w-3.5" />
+          <ChevronDown className="h-4 w-4" />
         ) : (
-          <ChevronRight className="h-3.5 w-3.5" />
+          <ChevronRight className="h-4 w-4" />
         )}
       </div>
       <h2

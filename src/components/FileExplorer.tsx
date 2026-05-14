@@ -689,20 +689,20 @@ export function FileExplorer({
                     e.stopPropagation();
                     startCreate("file");
                   }}
-                  className="text-muted-foreground hover:bg-accent rounded p-1 transition-colors"
+                  className="text-muted-foreground hover:bg-accent cursor-pointer rounded p-1 transition-colors"
                   title="New File"
                 >
-                  <FilePlus className="h-3.5 w-3.5" />
+                  <FilePlus className="h-4 w-4" />
                 </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     startCreate("folder");
                   }}
-                  className="text-muted-foreground hover:bg-accent rounded p-1 transition-colors"
+                  className="text-muted-foreground hover:bg-accent cursor-pointer rounded p-1 transition-colors"
                   title="New Folder"
                 >
-                  <FolderPlus className="h-3.5 w-3.5" />
+                  <FolderPlus className="h-4 w-4" />
                 </button>
                 <button
                   onClick={(e) => {
@@ -710,27 +710,27 @@ export function FileExplorer({
                     setIsAutoReveal(!isAutoReveal);
                   }}
                   className={cn(
-                    "hover:bg-accent rounded p-1 transition-colors",
+                    "hover:bg-accent cursor-pointer rounded p-1 transition-colors",
                     isAutoReveal
-                      ? "bg-accent/50 text-primary"
+                      ? "bg-accent text-primary"
                       : "text-muted-foreground"
                   )}
                   title="Auto Reveal File"
                 >
-                  <ListTree className="h-3.5 w-3.5" />
+                  <ListTree className="h-4 w-4" />
                 </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleExpandAll();
                   }}
-                  className="text-muted-foreground hover:bg-accent rounded p-1 transition-colors"
+                  className="text-muted-foreground hover:bg-accent cursor-pointer rounded p-1 transition-colors"
                   title={expandedPaths.size > 0 ? "Collapse All" : "Expand All"}
                 >
                   {expandedPaths.size > 0 ? (
-                    <ChevronsDownUp className="h-3.5 w-3.5" />
+                    <ChevronsDownUp className="h-4 w-4" />
                   ) : (
-                    <ChevronsUpDown className="h-3.5 w-3.5" />
+                    <ChevronsUpDown className="h-4 w-4" />
                   )}
                 </button>
               </div>
