@@ -129,6 +129,14 @@ export function FileExplorer({
   } = useFileExplorer(currentPath, rootEntries);
 
   const { cutPath, setCutPath, copyPath, setCopyPath } = useFileStore();
+
+  React.useEffect(() => {
+    if (!entries.length) return;
+    const paths = new Set(entries.map((e) => normalizePath(e.path)));
+    if (copyPath && !paths.has(normalizePath(copyPath))) setCopyPath(null);
+    if (cutPath && !paths.has(normalizePath(cutPath))) setCutPath(null);
+  }, [entries, copyPath, cutPath, setCopyPath, setCutPath]);
+
   const [isExpanded, setIsExpanded] = React.useState(true);
   const [prevFocusedIndex, setPrevFocusedIndex] = React.useState<number>(-1);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -330,6 +338,8 @@ export function FileExplorer({
       if (!deleteConfirmItem.is_dir) {
         onFileDeleted?.(deleteConfirmItem.path);
       }
+      if (copyPath === deleteConfirmItem.path) setCopyPath(null);
+      if (cutPath === deleteConfirmItem.path) setCutPath(null);
       setDeleteConfirmItem(null);
       await refreshTree(expandedPaths);
     } catch (e) {

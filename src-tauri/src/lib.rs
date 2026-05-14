@@ -291,13 +291,34 @@ fn copy_item(at: String, to_dir: String) -> Result<String, String> {
     let resolved_at = resolve_path(&at)?;
     let resolved_to_dir = resolve_path(&to_dir)?;
     let file_name = resolved_at.file_name().ok_or("Invalid file name")?;
-    let new_path = resolved_to_dir.join(file_name);
+    let mut new_path = resolved_to_dir.join(file_name);
 
     if new_path.exists() {
         if resolved_at.parent() == Some(&resolved_to_dir) {
             return duplicate_item(at);
         }
-        return Err("A file with the same name already exists in the destination".to_string());
+
+        let is_dir = resolved_at.is_dir();
+        let name = file_name.to_string_lossy();
+        let (stem, ext) = if is_dir {
+            (name.to_string(), String::new())
+        } else {
+            let p = Path::new(name.as_ref());
+            (
+                p.file_stem().unwrap_or_default().to_string_lossy().to_string(),
+                p.extension()
+                    .and_then(|e| e.to_str())
+                    .map(|e| format!(".{}", e))
+                    .unwrap_or_default(),
+            )
+        };
+
+        let mut count = 1;
+        new_path = resolved_to_dir.join(format!("{} Copy {}{}", stem, count, ext));
+        while new_path.exists() {
+            count += 1;
+            new_path = resolved_to_dir.join(format!("{} Copy {}{}", stem, count, ext));
+        }
     }
 
     let is_dir = resolved_at.is_dir();
