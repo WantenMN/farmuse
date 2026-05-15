@@ -12,6 +12,7 @@ import { SettingsPage } from "./components/SettingsPage";
 import { RecentFoldersPage } from "./components/RecentFoldersPage";
 import { RecentFilesPage } from "./components/RecentFilesPage";
 import { Tabs } from "./components/Tabs";
+import { TabSwitcher } from "./components/TabSwitcher";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
@@ -62,6 +63,39 @@ function App() {
     () => (rawActiveFilePath ? rawActiveFilePath.replace(/\\/g, "/") : null),
     [rawActiveFilePath]
   );
+
+  // MRU tab history for Ctrl+Tab switching
+  const [tabHistory, setTabHistory] = React.useState<string[]>([]);
+  React.useEffect(() => {
+    if (!activeFilePath) return;
+    setTabHistory((prev) => {
+      const h = prev.filter((p) => p !== activeFilePath);
+      h.unshift(activeFilePath);
+      return h;
+    });
+  }, [activeFilePath]);
+
+  // MRU-aware close wrappers
+  const mruCloseFile = React.useCallback(
+    (path: string) => {
+      closeFile(path);
+      setTabHistory((prev) => prev.filter((p) => p !== path));
+    },
+    [closeFile]
+  );
+
+  const mruCloseOthers = React.useCallback(
+    (path: string) => {
+      closeOthers(path);
+      setTabHistory([path]);
+    },
+    [closeOthers]
+  );
+
+  const mruCloseAll = React.useCallback(() => {
+    closeAll();
+    setTabHistory([]);
+  }, [closeAll]);
 
   const openFile = React.useCallback(
     (path: string, name: string) => {
@@ -210,7 +244,7 @@ function App() {
       if (timers.has(path)) return; // already pending
       const timer = setTimeout(() => {
         timers.delete(path);
-        closeFile(path);
+        mruCloseFile(path);
       }, 200);
       timers.set(path, timer);
     });
@@ -218,7 +252,7 @@ function App() {
       unlisten.then((fn) => fn());
       deleteTimersRef.current.forEach((t) => clearTimeout(t));
     };
-  }, [closeFile]);
+  }, [mruCloseFile]);
 
   // Track recently opened files
   React.useEffect(() => {
@@ -251,6 +285,7 @@ function App() {
     }
     closeWorkspaceFolder();
     clearTabs();
+    setTabHistory([]);
   }, [currentPath, openFiles, activeFilePath, closeWorkspaceFolder, clearTabs]);
 
   const openFolder = React.useCallback(async () => {
@@ -312,7 +347,7 @@ function App() {
           width={explorerWidth}
           onResizeStart={startResizing}
           onOpenFile={openFile}
-          onFileDeleted={closeFile}
+          onFileDeleted={mruCloseFile}
           onFileMoved={updatePaths}
           activeFilePath={activeFilePath}
           onCloseFolder={closeFolder}
@@ -330,9 +365,9 @@ function App() {
                   path: normalizedPath,
                 });
               }}
-              onClose={closeFile}
-              onCloseOthers={closeOthers}
-              onCloseAll={closeAll}
+              onClose={mruCloseFile}
+              onCloseOthers={mruCloseOthers}
+              onCloseAll={mruCloseAll}
             />
           )}
 
@@ -387,6 +422,18 @@ function App() {
         </main>
       </div>
 
+      <TabSwitcher
+        openFiles={openFiles}
+        activeFilePath={activeFilePath}
+        mruOrder={tabHistory}
+        onSelect={(path) => {
+          const normalizedPath = path.replace(/\\/g, "/");
+          setActiveFilePath(normalizedPath);
+          commandManager.execute("explorer.revealActiveFile", {
+            path: normalizedPath,
+          });
+        }}
+      />
       <CommandPalette />
       <QuickOpen onOpenFile={openFile} currentPath={currentPath} />
       <GlobalStatusBar />
