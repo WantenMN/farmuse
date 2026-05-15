@@ -221,12 +221,25 @@ fn create_directory(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn rename_item(at: String, new_name: String) -> Result<String, String> {
+async fn rename_item(state: tauri::State<'_, IndexerState>, at: String, new_name: String) -> Result<String, String> {
     let resolved_at = resolve_path(&at)?;
     let parent = resolved_at.parent().ok_or("Could not find parent directory")?;
-    let new_path = parent.join(new_name);
+    let new_path = parent.join(&new_name);
     fs::rename(&resolved_at, &new_path).map_err(|e| e.to_string())?;
-    Ok(new_path.to_string_lossy().to_string())
+
+    let db = {
+        let db_lock = state.db.lock().unwrap();
+        db_lock.clone()
+    };
+
+    if let Some(db) = db {
+        let old_path_str = resolved_at.to_string_lossy().to_string();
+        let new_path_str = new_path.to_string_lossy().to_string();
+        let is_dir = new_path.is_dir();
+        let _ = db.move_entry(&old_path_str, &new_path_str, &new_name, is_dir).await;
+    }
+
+    Ok(new_path.to_string_lossy().to_string().replace("\\", "/"))
 }
 
 #[tauri::command]
@@ -269,7 +282,7 @@ fn duplicate_item(path: String) -> Result<String, String> {
         fs::copy(&resolved_path, &new_path).map_err(|e| e.to_string())?;
     }
 
-    Ok(new_path.to_string_lossy().to_string())
+    Ok(new_path.to_string_lossy().to_string().replace("\\", "/"))
 }
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
@@ -327,11 +340,11 @@ fn copy_item(at: String, to_dir: String) -> Result<String, String> {
     } else {
         fs::copy(&resolved_at, &new_path).map_err(|e| e.to_string())?;
     }
-    Ok(new_path.to_string_lossy().to_string())
+    Ok(new_path.to_string_lossy().to_string().replace("\\", "/"))
 }
 
 #[tauri::command]
-fn move_item(at: String, to_dir: String) -> Result<String, String> {
+async fn move_item(state: tauri::State<'_, IndexerState>, at: String, to_dir: String) -> Result<String, String> {
     let resolved_at = resolve_path(&at)?;
     let resolved_to_dir = resolve_path(&to_dir)?;
     let file_name = resolved_at.file_name().ok_or("Invalid file name")?;
@@ -342,13 +355,27 @@ fn move_item(at: String, to_dir: String) -> Result<String, String> {
     }
 
     fs::rename(&resolved_at, &new_path).map_err(|e| e.to_string())?;
-    Ok(new_path.to_string_lossy().to_string())
+
+    let db = {
+        let db_lock = state.db.lock().unwrap();
+        db_lock.clone()
+    };
+
+    if let Some(db) = db {
+        let old_path_str = resolved_at.to_string_lossy().to_string();
+        let new_path_str = new_path.to_string_lossy().to_string();
+        let new_name = file_name.to_string_lossy().to_string();
+        let is_dir = new_path.is_dir();
+        let _ = db.move_entry(&old_path_str, &new_path_str, &new_name, is_dir).await;
+    }
+
+    Ok(new_path.to_string_lossy().to_string().replace("\\", "/"))
 }
 
 #[tauri::command]
 async fn list_all_subdirs(state: tauri::State<'_, IndexerState>, path: String) -> Result<Vec<String>, String> {
     let resolved_path = resolve_path(&path)?;
-    let path_str = resolved_path.to_string_lossy().to_string();
+    let path_str = resolved_path.to_string_lossy().to_string().replace("\\", "/");
 
     let db = {
         let db_lock = state.db.lock().unwrap();
@@ -400,7 +427,7 @@ async fn initialize_indexer(app: AppHandle, state: tauri::State<'_, IndexerState
     let app_handle_progress = app.clone();
     let db_clone = db.clone();
     let resolved_root_clone = resolved_root.clone();
-    let root_str = resolved_root.to_string_lossy().to_string();
+    let root_str = resolved_root.to_string_lossy().to_string().replace("\\", "/");
 
     let root_str_for_indexing = root_str.clone();
 
@@ -440,7 +467,8 @@ async fn initialize_indexer(app: AppHandle, state: tauri::State<'_, IndexerState
                 continue;
             }
 
-            found_paths.insert(path.clone());
+            let normalized_path = path.replace("\\", "/");
+            found_paths.insert(normalized_path.clone());
 
             let mtime = entry.metadata().ok().and_then(|m| m.modified().ok())
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
@@ -448,8 +476,8 @@ async fn initialize_indexer(app: AppHandle, state: tauri::State<'_, IndexerState
                 .unwrap_or(0);
 
             // Only update if mtime changed or entry is new
-            if existing_meta.get(&path) != Some(&mtime) {
-                let _ = DbManager::upsert_entry_tx(&mut tx, &path, &name, is_dir, mtime, &root_str_for_indexing).await;
+            if existing_meta.get(&normalized_path) != Some(&mtime) {
+                let _ = DbManager::upsert_entry_tx(&mut tx, &normalized_path, &name, is_dir, mtime, &root_str_for_indexing).await;
                 updated_count += 1;
             }
 
@@ -597,7 +625,7 @@ async fn get_explorer_entries(
     expand_all: Option<bool>,
 ) -> Result<Vec<FileExplorerEntry>, String> {
     let resolved_root = resolve_path(&root_path)?;
-    let root_str = resolved_root.to_string_lossy().to_string();
+    let root_str = resolved_root.to_string_lossy().to_string().replace("\\", "/");
     let is_expand_all = expand_all.unwrap_or(false);
     let expanded_set: HashSet<String> = if is_expand_all {
         HashSet::new()

@@ -7,7 +7,6 @@ interface UseFileExplorerCommandsProps {
   setIsActive: (active: boolean) => void;
   entries: FileExplorerEntry[];
   focusedIndex: number;
-  setFocusedIndex: React.Dispatch<React.SetStateAction<number>>;
   setFocusedPath: (path: string | null) => void;
   expandedPaths: Set<string>;
   toggleFolder: (index: number) => Promise<void>;
@@ -25,7 +24,6 @@ export function useFileExplorerCommands({
   setIsActive,
   entries,
   focusedIndex,
-  setFocusedIndex,
   setFocusedPath,
   expandedPaths,
   toggleFolder,
@@ -41,7 +39,6 @@ export function useFileExplorerCommands({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isActive) return;
 
-      // Ignore if editing an input or textarea
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
@@ -80,9 +77,7 @@ export function useFileExplorerCommands({
         setIsActive(true);
         scrollContainerRef.current?.focus();
         if (focusedIndex === -1 && entries.length > 0) {
-          const newIndex = 0;
-          setFocusedIndex(newIndex);
-          setFocusedPath(entries[newIndex].path);
+          setFocusedPath(entries[0].path);
         }
       },
     });
@@ -93,11 +88,8 @@ export function useFileExplorerCommands({
       description: "Focus the next item in the explorer",
       handler: () => {
         if (!isActive || entries.length === 0) return;
-        setFocusedIndex((prev) => {
-          const next = prev < entries.length - 1 ? prev + 1 : 0;
-          setFocusedPath(entries[next].path);
-          return next;
-        });
+        const next = focusedIndex < entries.length - 1 ? focusedIndex + 1 : 0;
+        setFocusedPath(entries[next].path);
       },
       visible: true,
     });
@@ -108,11 +100,8 @@ export function useFileExplorerCommands({
       description: "Focus the previous item in the explorer",
       handler: () => {
         if (!isActive || entries.length === 0) return;
-        setFocusedIndex((prev) => {
-          const next = prev > 0 ? prev - 1 : entries.length - 1;
-          setFocusedPath(entries[next].path);
-          return next;
-        });
+        const next = focusedIndex > 0 ? focusedIndex - 1 : entries.length - 1;
+        setFocusedPath(entries[next].path);
       },
       visible: true,
     });
@@ -146,7 +135,6 @@ export function useFileExplorerCommands({
 
         for (let i = focusedIndex - 1; i >= 0; i--) {
           if (entries[i].depth < currentEntry.depth) {
-            setFocusedIndex(i);
             setFocusedPath(entries[i].path);
             break;
           }
@@ -203,7 +191,6 @@ export function useFileExplorerCommands({
     expandedPaths,
     toggleFolder,
     setIsActive,
-    setFocusedIndex,
     setFocusedPath,
     scrollContainerRef,
     onOpenFile,

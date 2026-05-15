@@ -8,7 +8,9 @@ interface FileExplorerItemProps {
   isFocused: boolean;
   isExpanded: boolean;
   isCut?: boolean;
+  isDragging?: boolean;
   onClick: (e: React.MouseEvent) => void;
+  onMouseDown?: (e: React.MouseEvent) => void;
   isEditing?: boolean;
   editName?: string;
   onEditChange?: (name: string) => void;
@@ -22,7 +24,9 @@ export function FileExplorerItem({
   isFocused,
   isExpanded,
   isCut,
+  isDragging,
   onClick,
+  onMouseDown,
   isEditing,
   editName,
   onEditChange,
@@ -46,14 +50,17 @@ export function FileExplorerItem({
 
   return (
     <div
+      data-entry-path={entry.path}
       className={cn(
         "group relative flex cursor-pointer items-center gap-1 rounded-sm px-1.5 py-0.5 text-sm transition-none",
         isFocused && "bg-accent text-accent-foreground z-10",
         !isFocused && "hover:bg-accent/30",
-        isCut && "opacity-50 grayscale-[0.5]"
+        isCut && "opacity-50 grayscale-[0.5]",
+        isDragging && "opacity-40"
       )}
       style={{ paddingLeft: `${entry.depth * 12 + 6}px` }}
       onClick={onClick}
+      onMouseDown={onMouseDown}
       onContextMenu={onContextMenu}
     >
       {/* Vertical line for expanded scope */}

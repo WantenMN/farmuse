@@ -43,6 +43,8 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Button } from "./ui/button";
+import { useDragDrop } from "../hooks/useDragDrop";
+import { DragOverlay } from "./FileExplorer/DragOverlay";
 
 interface FileExplorerProps {
   currentPath: string | null;
@@ -119,7 +121,6 @@ export function FileExplorer({
     entries,
     expandedPaths,
     focusedIndex,
-    setFocusedIndex,
     setFocusedPath,
     isActive,
     setIsActive,
@@ -138,7 +139,7 @@ export function FileExplorer({
   }, [entries, copyPath, cutPath, setCopyPath, setCutPath]);
 
   const [isExpanded, setIsExpanded] = React.useState(true);
-  const [prevFocusedIndex, setPrevFocusedIndex] = React.useState<number>(-1);
+  const prevFocusedIndexRef = React.useRef<number>(-1);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   const virtuosoRef = React.useRef(null);
 
@@ -169,6 +170,103 @@ export function FileExplorer({
     React.useState<FileExplorerEntry | null>(null);
 
   const normalizePath = (path: string) => path.replace(/\\/g, "/");
+
+  const expandedPathsRef = React.useRef(expandedPaths);
+  expandedPathsRef.current = expandedPaths;
+
+  const refreshTreeRef = React.useRef(refreshTree);
+  refreshTreeRef.current = refreshTree;
+
+  const revealAndFocus = React.useCallback(
+    async (path: string) => {
+      if (!currentPath) return;
+      const normalizedCurrent = normalizePath(currentPath);
+      const normalizedTarget = normalizePath(path);
+
+      if (!normalizedTarget.startsWith(normalizedCurrent)) return;
+
+      const relativePath = normalizedTarget.substring(normalizedCurrent.length);
+      const parts = relativePath.split("/").filter(Boolean);
+      const currentExpanded = expandedPathsRef.current;
+      const newExpanded = new Set(currentExpanded);
+      let current = normalizedCurrent;
+      let changed = false;
+
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = current.endsWith("/")
+          ? `${current}${parts[i]}`
+          : `${current}/${parts[i]}`;
+        if (!newExpanded.has(current)) {
+          newExpanded.add(current);
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        setExpandedPaths(newExpanded);
+        await refreshTreeRef.current(newExpanded);
+      } else {
+        await refreshTreeRef.current(currentExpanded);
+      }
+      setFocusedPath(normalizedTarget);
+      setIsActive(true);
+    },
+    [currentPath, setExpandedPaths, setFocusedPath, setIsActive]
+  );
+
+  const handleDragMove = React.useCallback(
+    async (sourcePath: string, targetDir: string) => {
+      const finalTargetDir = targetDir || currentPath || "";
+      const normalizedSource = normalizePath(sourcePath);
+      const normalizedTarget = normalizePath(finalTargetDir);
+      const sourceParent = normalizedSource.substring(
+        0,
+        normalizedSource.lastIndexOf("/")
+      );
+
+      if (sourceParent === normalizedTarget) return;
+
+      try {
+        const resultPath = await invoke<string>("move_item", {
+          at: sourcePath,
+          toDir: finalTargetDir,
+        });
+        onFileMoved?.(sourcePath, resultPath);
+        await revealAndFocus(resultPath);
+      } catch (e) {
+        console.error("Failed to move via drag", e);
+      }
+    },
+    [onFileMoved, revealAndFocus, currentPath]
+  );
+
+  const { dragState, handleMouseDown } = useDragDrop({
+    entries,
+    expandedPaths,
+    onMove: handleDragMove,
+    scrollContainerRef,
+  });
+
+  // Listen for folder expand events during drag hover
+  React.useEffect(() => {
+    const handleDragExpand = async (e: Event) => {
+      if (!dragState?.isDragging) return;
+
+      const customEvent = e as CustomEvent<{ path: string }>;
+      const path = customEvent.detail?.path;
+      if (path && !expandedPaths.has(path)) {
+        const newExpanded = new Set(expandedPaths);
+        newExpanded.add(path);
+        setExpandedPaths(newExpanded);
+        await refreshTree(newExpanded);
+      }
+    };
+
+    window.addEventListener("drag-expand-folder", handleDragExpand);
+    return () => {
+      window.removeEventListener("drag-expand-folder", handleDragExpand);
+    };
+  }, [dragState?.isDragging, expandedPaths, setExpandedPaths, refreshTree]);
 
   const revealFile = React.useCallback(
     async (path: string, isManualTabSwitch: boolean = false) => {
@@ -355,7 +453,6 @@ export function FileExplorer({
       const cutPathDir =
         lastSlash !== -1 ? normalizedCutPath.substring(0, lastSlash) : "";
 
-      // If same directory or same item, do nothing
       if (
         normalizedCutPath === normalizedTargetDir ||
         cutPathDir === normalizedTargetDir
@@ -430,12 +527,10 @@ export function FileExplorer({
   };
 
   const handleEmptyAreaClick = () => {
-    setFocusedIndex(-1);
     setFocusedPath(null);
   };
 
   const handleEmptyAreaContextMenu = () => {
-    setFocusedIndex(-1);
     setFocusedPath(null);
   };
 
@@ -444,7 +539,6 @@ export function FileExplorer({
     setIsActive,
     entries,
     focusedIndex,
-    setFocusedIndex,
     setFocusedPath,
     expandedPaths,
     toggleFolder,
@@ -507,18 +601,16 @@ export function FileExplorer({
     if (
       focusedIndex !== -1 &&
       virtuosoRef.current &&
-      focusedIndex !== prevFocusedIndex
+      focusedIndex !== prevFocusedIndexRef.current
     ) {
+      prevFocusedIndexRef.current = focusedIndex;
       // @ts-expect-error virtuoso type issues
       virtuosoRef.current.scrollIntoView({
         index: focusedIndex,
         behavior: "auto",
-        done: () => {
-          setPrevFocusedIndex(focusedIndex);
-        },
       });
     }
-  }, [focusedIndex, entries.length, prevFocusedIndex]);
+  }, [focusedIndex]);
 
   const renderContextMenuContent = (entry?: FileExplorerEntry) => {
     const isFolder = entry && entry.is_dir;
@@ -802,7 +894,6 @@ export function FileExplorer({
                           <ContextMenu
                             onOpenChange={(open) => {
                               if (open) {
-                                setFocusedIndex(index);
                                 setFocusedPath(entry.path);
                                 setIsActive(true);
                               }
@@ -812,7 +903,6 @@ export function FileExplorer({
                               <div
                                 onContextMenu={(e) => {
                                   e.stopPropagation();
-                                  setFocusedIndex(index);
                                   setFocusedPath(entry.path);
                                   setIsActive(true);
                                 }}
@@ -822,14 +912,18 @@ export function FileExplorer({
                                   isFocused={index === focusedIndex}
                                   isExpanded={expandedPaths.has(entry.path)}
                                   isCut={cutPath === entry.path}
+                                  isDragging={
+                                    dragState?.isDragging &&
+                                    dragState.sourceEntry.path === entry.path
+                                  }
                                   isEditing={editingItem?.path === entry.path}
                                   editName={editName}
                                   onEditChange={setEditName}
                                   onEditSubmit={handleRename}
                                   onEditCancel={() => setEditingItem(null)}
+                                  onMouseDown={(e) => handleMouseDown(e, entry)}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setFocusedIndex(index);
                                     setFocusedPath(entry.path);
                                     setIsActive(true);
                                     if (entry.is_dir) {
@@ -895,6 +989,14 @@ export function FileExplorer({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {dragState?.isDragging && (
+        <DragOverlay
+          dragState={dragState}
+          scrollContainerRef={scrollContainerRef}
+          entries={entries}
+        />
+      )}
     </aside>
   );
 }

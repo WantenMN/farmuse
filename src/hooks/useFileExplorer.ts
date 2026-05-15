@@ -15,12 +15,21 @@ export function useFileExplorer(
   const [expandedPaths, setExpandedPaths] = React.useState<Set<string>>(
     new Set()
   );
-  const [focusedIndex, setFocusedIndex] = React.useState<number>(-1);
   const [focusedPath, setFocusedPath] = React.useState<string | null>(null);
   const [isActive, setIsActive] = React.useState(false);
   const lastRootPath = React.useRef<string | null>(null);
   const hasRestored = React.useRef(false);
   const expandedPathsRef = React.useRef(expandedPaths);
+  const watcherDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
+  // Derive focusedIndex from focusedPath (single source of truth)
+  const focusedIndex = React.useMemo(() => {
+    if (!focusedPath || entries.length === 0) return -1;
+    const normalized = focusedPath.replace(/\\/g, "/");
+    return entries.findIndex((e) => e.path.replace(/\\/g, "/") === normalized);
+  }, [entries, focusedPath]);
 
   // Keep ref in sync
   React.useEffect(() => {
@@ -57,7 +66,6 @@ export function useFileExplorer(
     if (!currentPath) {
       setEntries([]);
       setExpandedPaths(new Set());
-      setFocusedIndex(-1);
       setFocusedPath(null);
       hasRestored.current = false;
       lastRootPath.current = null;
@@ -97,32 +105,12 @@ export function useFileExplorer(
       if (!hasRestored.current) {
         setEntries(rootEntries.map((e) => ({ ...e, depth: 0 })));
         setExpandedPaths(new Set());
-        setFocusedIndex(rootEntries.length > 0 ? 0 : -1);
         hasRestored.current = true;
       }
     } else if (rootEntries.length > 0) {
       refreshTree(expandedPathsRef.current);
     }
   }, [rootEntries, currentPath, refreshTree]);
-
-  // Sync focusedIndex and focusedPath
-  React.useEffect(() => {
-    if (focusedPath) {
-      const normalizedFocused = focusedPath.replace(/\\/g, "/");
-      const index = entries.findIndex(
-        (e) => e.path.replace(/\\/g, "/") === normalizedFocused
-      );
-      if (index !== -1) {
-        if (index !== focusedIndex) {
-          setFocusedIndex(index);
-        }
-      } else if (focusedIndex >= entries.length) {
-        setFocusedIndex(entries.length > 0 ? 0 : -1);
-      }
-    } else if (focusedIndex !== -1 && entries[focusedIndex]) {
-      setFocusedPath(entries[focusedIndex].path.replace(/\\/g, "/"));
-    }
-  }, [entries, focusedPath, focusedIndex]);
 
   // Persist state
   React.useEffect(() => {
@@ -159,21 +147,31 @@ export function useFileExplorer(
     );
   }, [expandedPaths, currentPath]);
 
-  // Listen for refresh events
+  // Listen for refresh events (debounced, no suppress)
   React.useEffect(() => {
-    const unlistenRefresh = listen<string>("explorer-refresh", (_event) => {
-      if (currentPath) {
-        refreshTree(expandedPathsRef.current);
+    const debouncedRefresh = () => {
+      if (watcherDebounceRef.current) {
+        clearTimeout(watcherDebounceRef.current);
       }
+      watcherDebounceRef.current = setTimeout(() => {
+        if (currentPath) {
+          refreshTree(expandedPathsRef.current);
+        }
+      }, 300);
+    };
+
+    const unlistenRefresh = listen<string>("explorer-refresh", () => {
+      debouncedRefresh();
     });
 
     const unlistenIndex = listen("index-updated", () => {
-      if (currentPath) {
-        refreshTree(expandedPathsRef.current);
-      }
+      debouncedRefresh();
     });
 
     return () => {
+      if (watcherDebounceRef.current) {
+        clearTimeout(watcherDebounceRef.current);
+      }
       unlistenRefresh.then((unlisten) => unlisten());
       unlistenIndex.then((unlisten) => unlisten());
     };
@@ -204,7 +202,6 @@ export function useFileExplorer(
     entries,
     expandedPaths,
     focusedIndex,
-    setFocusedIndex,
     focusedPath,
     setFocusedPath,
     isActive,
