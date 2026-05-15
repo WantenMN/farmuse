@@ -121,7 +121,7 @@ export function FileExplorer({
     entries,
     expandedPaths,
     focusedIndex,
-    setFocusedPath,
+    setFocusedPath: setFocusedPathRaw,
     selectedPaths,
     setSelectedPaths,
     anchorPathRef,
@@ -131,6 +131,14 @@ export function FileExplorer({
     refreshTree,
     setExpandedPaths,
   } = useFileExplorer(currentPath, rootEntries);
+
+  const setFocusedPath = React.useCallback(
+    (path: string | null) => {
+      setFocusedPathRaw(path);
+      if (path) anchorPathRef.current = path;
+    },
+    [setFocusedPathRaw, anchorPathRef]
+  );
 
   const { cutPath, setCutPath, copyPath, setCopyPath } = useFileStore();
 
@@ -234,17 +242,20 @@ export function FileExplorer({
       if (pathsToMove.length === 0) return;
 
       try {
-        let lastResultPath: string | null = null;
+        const resultPaths: string[] = [];
         for (const sourcePath of pathsToMove) {
           const resultPath = await invoke<string>("move_item", {
             at: sourcePath,
             toDir: finalTargetDir,
           });
           onFileMoved?.(sourcePath, resultPath);
-          lastResultPath = resultPath;
+          resultPaths.push(resultPath);
         }
-        if (lastResultPath) {
-          await revealAndFocus(lastResultPath);
+        if (resultPaths.length > 0) {
+          resultPaths.sort((a, b) =>
+            a.replace(/\\/g, "/").localeCompare(b.replace(/\\/g, "/"))
+          );
+          await revealAndFocus(resultPaths[0]);
         }
       } catch (e) {
         console.error("Failed to move via drag", e);
@@ -312,6 +323,9 @@ export function FileExplorer({
         await refreshTree(newExpanded);
         setExpandedPaths(newExpanded);
       }
+      if (!selectedPaths.has(normalizedTarget)) {
+        setSelectedPaths(new Set());
+      }
       setFocusedPath(normalizedTarget);
     },
     [
@@ -321,6 +335,8 @@ export function FileExplorer({
       setExpandedPaths,
       setFocusedPath,
       isAutoReveal,
+      selectedPaths,
+      setSelectedPaths,
     ]
   );
 
@@ -969,9 +985,8 @@ export function FileExplorer({
                                           next.add(entry.path);
                                         }
                                         return next;
-                                      });
+                                       });
                                       setFocusedPath(entry.path);
-                                      anchorPathRef.current = entry.path;
                                     } else if (
                                       e.shiftKey &&
                                       anchorPathRef.current
@@ -990,19 +1005,16 @@ export function FileExplorer({
                                           startIdx < endIdx
                                             ? [startIdx, endIdx]
                                             : [endIdx, startIdx];
-                                        setSelectedPaths((prev) => {
-                                          const next = new Set(prev);
-                                          for (let i = lo; i <= hi; i++) {
-                                            next.add(entries[i].path);
-                                          }
-                                          return next;
-                                        });
+                                        const range = new Set<string>();
+                                        for (let i = lo; i <= hi; i++) {
+                                          range.add(entries[i].path);
+                                        }
+                                        setSelectedPaths(range);
                                       }
-                                      setFocusedPath(entry.path);
+                                      setFocusedPathRaw(entry.path);
                                     } else {
                                       setSelectedPaths(new Set([entry.path]));
                                       setFocusedPath(entry.path);
-                                      anchorPathRef.current = entry.path;
                                       if (entry.is_dir) {
                                         toggleFolder(index);
                                       } else {
