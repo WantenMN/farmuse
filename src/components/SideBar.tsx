@@ -1,9 +1,10 @@
-import { Files, Settings } from "lucide-react";
+import { Files, Clock, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SideBarProps {
   showExplorer: boolean;
   onToggleExplorer: () => void;
+  onOpenRecentFiles: () => void;
   onOpenSettings: () => void;
   activePath: string | null;
 }
@@ -11,6 +12,7 @@ interface SideBarProps {
 export function SideBar({
   showExplorer,
   onToggleExplorer,
+  onOpenRecentFiles,
   onOpenSettings,
   activePath,
 }: SideBarProps) {
@@ -31,6 +33,22 @@ export function SideBar({
       </button>
 
       <div className="mt-auto" />
+
+      <button
+        onClick={onOpenRecentFiles}
+        className={cn(
+          "hover:bg-muted group relative flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
+          activePath === "recent-files://"
+            ? "text-primary"
+            : "text-muted-foreground"
+        )}
+        title="Recent Files"
+      >
+        <Clock className="h-5 w-5" />
+        {activePath === "recent-files://" && (
+          <div className="bg-primary absolute left-0 h-6 w-0.5 rounded-r-full" />
+        )}
+      </button>
 
       <button
         onClick={onOpenSettings}

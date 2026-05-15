@@ -10,6 +10,7 @@ import { SideBar } from "./components/SideBar";
 import { Editor } from "./components/Editor";
 import { SettingsPage } from "./components/SettingsPage";
 import { RecentFoldersPage } from "./components/RecentFoldersPage";
+import { RecentFilesPage } from "./components/RecentFilesPage";
 import { Tabs } from "./components/Tabs";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -219,6 +220,20 @@ function App() {
     };
   }, [closeFile]);
 
+  // Track recently opened files
+  React.useEffect(() => {
+    if (!activeFilePath || activeFilePath.includes("://")) return;
+    const saved = JSON.parse(
+      localStorage.getItem("farmuse_recent_files") || "[]"
+    ) as string[];
+    const updated = [
+      activeFilePath,
+      ...saved.filter((p) => p !== activeFilePath),
+    ].slice(0, 50);
+    localStorage.setItem("farmuse_recent_files", JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent("recent-files-updated"));
+  }, [activeFilePath]);
+
   const closeFolder = React.useCallback(() => {
     if (currentPath) {
       const isConsistent = openFiles.every(
@@ -263,6 +278,7 @@ function App() {
       },
       openFolder,
       openRecentFolders: () => openFile("recent-folders://", "Recent Folders"),
+      openRecentFiles: () => openFile("recent-files://", "Recent Files"),
     });
 
     return () => {
@@ -285,6 +301,7 @@ function App() {
         <SideBar
           showExplorer={showExplorer}
           onToggleExplorer={() => setShowExplorer(!showExplorer)}
+          onOpenRecentFiles={() => openFile("recent-files://", "Recent Files")}
           onOpenSettings={() => openFile("settings://", "Settings")}
           activePath={activeFilePath}
         />
@@ -349,6 +366,11 @@ function App() {
                         );
                       }
                     }}
+                  />
+                ) : file.path === "recent-files://" ? (
+                  <RecentFilesPage
+                    onOpenFile={openFile}
+                    activeFilePath={activeFilePath}
                   />
                 ) : (
                   <Editor

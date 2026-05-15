@@ -78,6 +78,7 @@ export function registerAppCommands(handlers: {
   closeFile: () => void;
   openFolder: () => void;
   openRecentFolders: () => void;
+  openRecentFiles: () => void;
 }) {
   commandManager.register({
     id: "toggle-explorer",
@@ -113,6 +114,13 @@ export function registerAppCommands(handlers: {
     description: "Show recently opened folders",
     handler: handlers.openRecentFolders,
   });
+
+  commandManager.register({
+    id: "open-recent-files",
+    name: "Open Recent Files",
+    description: "Show recently opened files",
+    handler: handlers.openRecentFiles,
+  });
 }
 
 /**
@@ -140,4 +148,5 @@ export function unregisterAppCommands() {
   commandManager.unregister("close-file");
   commandManager.unregister("open-folder");
   commandManager.unregister("open-recent-folders");
+  commandManager.unregister("open-recent-files");
 }
