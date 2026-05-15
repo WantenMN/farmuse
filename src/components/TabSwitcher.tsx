@@ -21,6 +21,25 @@ export function TabSwitcher({
 }: TabSwitcherProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [selectedIndex, setSelectedIndex] = React.useState(0);
+  const itemRefs = React.useRef<Map<number, HTMLDivElement>>(new Map());
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const el = itemRefs.current.get(selectedIndex);
+    const container = scrollRef.current;
+    if (!el || !container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const buffer = 2 * elRect.height;
+
+    if (elRect.bottom > containerRect.bottom - buffer) {
+      container.scrollTop += elRect.bottom - containerRect.bottom + buffer;
+    } else if (elRect.top < containerRect.top + buffer) {
+      container.scrollTop += elRect.top - containerRect.top - buffer;
+    }
+  }, [selectedIndex, isOpen]);
 
   const mruFiles = React.useMemo(() => {
     const files: TabFile[] = [];
@@ -112,14 +131,18 @@ export function TabSwitcher({
 
   return (
     <div className="fixed inset-0 z-50" onKeyUp={() => close(true)}>
-      <div className="bg-popover text-popover-foreground border-border absolute top-[20%] left-1/2 w-[340px] -translate-x-1/2 rounded-lg border shadow-xl">
+      <div className="bg-popover text-popover-foreground border-border absolute top-[12%] left-1/2 w-[480px] -translate-x-1/2 rounded-lg border shadow-xl">
         <div className="text-muted-foreground border-border border-b px-3 py-2 text-xs font-medium">
           Open Editors
         </div>
-        <div className="max-h-[300px] overflow-y-auto p-1">
+        <div ref={scrollRef} className="max-h-[400px] overflow-y-auto p-1">
           {mruFiles.map((file, i) => (
             <div
               key={file.path}
+              ref={(el) => {
+                if (el) itemRefs.current.set(i, el);
+                else itemRefs.current.delete(i);
+              }}
               className={cn(
                 "flex items-center rounded-md px-3 py-1.5 text-sm",
                 i === selectedIndex && "bg-accent text-accent-foreground"
