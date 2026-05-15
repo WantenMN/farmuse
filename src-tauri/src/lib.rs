@@ -137,6 +137,8 @@ fn watch_file(app: AppHandle, state: tauri::State<WatcherState>, path: String) -
         if let Ok(event) = res {
             if event.kind.is_modify() {
                 let _ = app_clone.emit("file-changed", path_clone.clone());
+            } else if event.kind.is_remove() {
+                let _ = app_clone.emit("file-deleted", path_clone.clone());
             }
         }
     }).map_err(|e| e.to_string())?;

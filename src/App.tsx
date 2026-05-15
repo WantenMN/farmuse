@@ -14,6 +14,7 @@ import { Tabs } from "./components/Tabs";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useWorkspace } from "./hooks/useWorkspace";
 import { useTabs } from "./hooks/useTabs";
 import { commandManager } from "./systems/commandManager";
@@ -194,6 +195,29 @@ function App() {
       }
     }
   }, [currentPath, openFiles, activeFilePath, showExplorer, explorerWidth]);
+
+  // Close tab when its backing file is deleted externally.
+  // Delay allows updatePaths (rename/move) to fire first —
+  // if the path is updated in time, closeFile(oldPath) is a no-op.
+  const deleteTimersRef = React.useRef<
+    Map<string, ReturnType<typeof setTimeout>>
+  >(new Map());
+  React.useEffect(() => {
+    const unlisten = listen<string>("file-deleted", (event) => {
+      const path = event.payload;
+      const timers = deleteTimersRef.current;
+      if (timers.has(path)) return; // already pending
+      const timer = setTimeout(() => {
+        timers.delete(path);
+        closeFile(path);
+      }, 200);
+      timers.set(path, timer);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+      deleteTimersRef.current.forEach((t) => clearTimeout(t));
+    };
+  }, [closeFile]);
 
   const closeFolder = React.useCallback(() => {
     if (currentPath) {
