@@ -31,6 +31,16 @@ export function Tabs({
   onCloseAll,
 }: TabsProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const tabRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Auto-scroll active tab into view
+  React.useEffect(() => {
+    if (!activePath) return;
+    const el = tabRefs.current.get(activePath);
+    if (el) {
+      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }, [activePath]);
 
   return (
     <div className="relative">
@@ -44,6 +54,10 @@ export function Tabs({
             <ContextMenu key={file.path}>
               <ContextMenuTrigger asChild>
                 <div
+                  ref={(el) => {
+                    if (el) tabRefs.current.set(file.path, el);
+                    else tabRefs.current.delete(file.path);
+                  }}
                   className={cn(
                     "group relative flex min-w-[120px] shrink-0 cursor-pointer items-center gap-2 border-r px-3 text-xs transition-colors",
                     isActive
