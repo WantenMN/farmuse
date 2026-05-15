@@ -948,6 +948,7 @@ export function FileExplorer({
                             onOpenChange={(open) => {
                               if (open) {
                                 setFocusedPath(entry.path);
+                                setSelectedPaths(new Set([entry.path]));
                                 setIsActive(true);
                               }
                             }}
@@ -957,6 +958,7 @@ export function FileExplorer({
                                 onContextMenu={(e) => {
                                   e.stopPropagation();
                                   setFocusedPath(entry.path);
+                                  setSelectedPaths(new Set([entry.path]));
                                   setIsActive(true);
                                 }}
                               >
@@ -1005,7 +1007,7 @@ export function FileExplorer({
                                           next.add(entry.path);
                                         }
                                         return next;
-                                       });
+                                      });
                                       setFocusedPath(entry.path);
                                     } else if (
                                       e.shiftKey &&
