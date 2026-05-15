@@ -121,10 +121,10 @@ export function FileExplorer({
     entries,
     expandedPaths,
     focusedIndex,
-    focusedPath,
     setFocusedPath,
     selectedPaths,
     setSelectedPaths,
+    anchorPathRef,
     isActive,
     setIsActive,
     toggleFolder,
@@ -542,11 +542,13 @@ export function FileExplorer({
   const handleEmptyAreaClick = () => {
     setFocusedPath(null);
     setSelectedPaths(new Set());
+    anchorPathRef.current = null;
   };
 
   const handleEmptyAreaContextMenu = () => {
     setFocusedPath(null);
     setSelectedPaths(new Set());
+    anchorPathRef.current = null;
   };
 
   useFileExplorerCommands({
@@ -969,11 +971,18 @@ export function FileExplorer({
                                         return next;
                                       });
                                       setFocusedPath(entry.path);
-                                    } else if (e.shiftKey && focusedPath) {
+                                      anchorPathRef.current = entry.path;
+                                    } else if (
+                                      e.shiftKey &&
+                                      anchorPathRef.current
+                                    ) {
                                       const startIdx = entries.findIndex(
                                         (en) =>
                                           en.path.replace(/\\/g, "/") ===
-                                          focusedPath.replace(/\\/g, "/")
+                                          anchorPathRef.current!.replace(
+                                            /\\/g,
+                                            "/"
+                                          )
                                       );
                                       const endIdx = index;
                                       if (startIdx !== -1) {
@@ -981,16 +990,19 @@ export function FileExplorer({
                                           startIdx < endIdx
                                             ? [startIdx, endIdx]
                                             : [endIdx, startIdx];
-                                        const range = new Set<string>();
-                                        for (let i = lo; i <= hi; i++) {
-                                          range.add(entries[i].path);
-                                        }
-                                        setSelectedPaths(range);
+                                        setSelectedPaths((prev) => {
+                                          const next = new Set(prev);
+                                          for (let i = lo; i <= hi; i++) {
+                                            next.add(entries[i].path);
+                                          }
+                                          return next;
+                                        });
                                       }
                                       setFocusedPath(entry.path);
                                     } else {
                                       setSelectedPaths(new Set([entry.path]));
                                       setFocusedPath(entry.path);
+                                      anchorPathRef.current = entry.path;
                                       if (entry.is_dir) {
                                         toggleFolder(index);
                                       } else {

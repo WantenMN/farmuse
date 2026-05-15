@@ -20,6 +20,7 @@ export function useFileExplorer(
     new Set()
   );
   const [isActive, setIsActive] = React.useState(false);
+  const anchorPathRef = React.useRef<string | null>(null);
   const lastRootPath = React.useRef<string | null>(null);
   const hasRestored = React.useRef(false);
   const expandedPathsRef = React.useRef(expandedPaths);
@@ -209,6 +210,7 @@ export function useFileExplorer(
     setFocusedPath,
     selectedPaths,
     setSelectedPaths,
+    anchorPathRef,
     isActive,
     setIsActive,
     toggleFolder,
