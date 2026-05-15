@@ -16,6 +16,9 @@ export function useFileExplorer(
     new Set()
   );
   const [focusedPath, setFocusedPath] = React.useState<string | null>(null);
+  const [selectedPaths, setSelectedPaths] = React.useState<Set<string>>(
+    new Set()
+  );
   const [isActive, setIsActive] = React.useState(false);
   const lastRootPath = React.useRef<string | null>(null);
   const hasRestored = React.useRef(false);
@@ -204,6 +207,8 @@ export function useFileExplorer(
     focusedIndex,
     focusedPath,
     setFocusedPath,
+    selectedPaths,
+    setSelectedPaths,
     isActive,
     setIsActive,
     toggleFolder,

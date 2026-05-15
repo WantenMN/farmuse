@@ -8,7 +8,7 @@ export interface DropTarget {
 }
 
 export interface DragState {
-  sourceEntry: FileExplorerEntry;
+  sourceEntries: FileExplorerEntry[];
   startX: number;
   startY: number;
   currentX: number;
@@ -20,7 +20,7 @@ export interface DragState {
 interface UseDragDropProps {
   entries: FileExplorerEntry[];
   expandedPaths: Set<string>;
-  onMove: (sourcePath: string, targetDir: string) => void;
+  onMove: (sourcePaths: string[], targetDir: string) => void;
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -121,27 +121,32 @@ export function useDragDrop({
   );
 
   const isValidMove = React.useCallback(
-    (source: FileExplorerEntry, target: DropTarget): boolean => {
-      const sourcePath = source.path;
-      const sourceParent = sourcePath.substring(0, sourcePath.lastIndexOf("/"));
+    (sources: FileExplorerEntry[], target: DropTarget): boolean => {
+      return sources.some((source) => {
+        const sourcePath = source.path;
+        const sourceParent = sourcePath.substring(
+          0,
+          sourcePath.lastIndexOf("/")
+        );
 
-      if (target.position === "root") {
-        if (!sourceParent || sourceParent === "") return false;
+        if (target.position === "root") {
+          if (!sourceParent || sourceParent === "") return false;
+          return true;
+        }
+
+        const targetEntry = target.entry;
+        if (!targetEntry) return true;
+
+        if (sourcePath === targetEntry.path) return false;
+
+        if (source.is_dir && targetEntry.path.startsWith(sourcePath + "/")) {
+          return false;
+        }
+
+        if (sourceParent === targetEntry.path) return false;
+
         return true;
-      }
-
-      const targetEntry = target.entry;
-      if (!targetEntry) return true;
-
-      if (sourcePath === targetEntry.path) return false;
-
-      if (source.is_dir && targetEntry.path.startsWith(sourcePath + "/")) {
-        return false;
-      }
-
-      if (sourceParent === targetEntry.path) return false;
-
-      return true;
+      });
     },
     []
   );
@@ -214,11 +219,11 @@ export function useDragDrop({
   );
 
   const handleMouseDown = React.useCallback(
-    (e: React.MouseEvent, entry: FileExplorerEntry) => {
+    (e: React.MouseEvent, sourceEntries: FileExplorerEntry[]) => {
       if (e.button !== 0) return;
 
       const initial: DragState = {
-        sourceEntry: entry,
+        sourceEntries,
         startX: e.clientX,
         startY: e.clientY,
         currentX: e.clientX,
@@ -233,16 +238,16 @@ export function useDragDrop({
   );
 
   const handleMouseMove = React.useCallback((e: MouseEvent) => {
-    // Only store the latest mouse position; RAF will process it
     pendingMouseRef.current = { x: e.clientX, y: e.clientY };
   }, []);
 
   const handleMouseUp = React.useCallback(() => {
     const current = dragStateRef.current;
     if (current?.isDragging && current.dropTarget) {
-      if (isValidMove(current.sourceEntry, current.dropTarget)) {
+      if (isValidMove(current.sourceEntries, current.dropTarget)) {
         const targetDir = getTargetDir(current.dropTarget);
-        onMoveRef.current(current.sourceEntry.path, targetDir);
+        const sourcePaths = current.sourceEntries.map((s) => s.path);
+        onMoveRef.current(sourcePaths, targetDir);
       }
     }
 

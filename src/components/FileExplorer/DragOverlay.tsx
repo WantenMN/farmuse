@@ -5,7 +5,7 @@ import { FileExplorerEntry } from "../../hooks/useFileExplorer";
 interface DragOverlayProps {
   dragState: {
     isDragging: boolean;
-    sourceEntry: FileExplorerEntry;
+    sourceEntries: FileExplorerEntry[];
     dropTarget: DropTarget | null;
     currentX: number;
     currentY: number;
@@ -21,7 +21,10 @@ export function DragOverlay({
 }: DragOverlayProps) {
   if (!dragState.isDragging) return null;
 
-  const { sourceEntry, dropTarget, currentX, currentY } = dragState;
+  const { sourceEntries, dropTarget, currentX, currentY } = dragState;
+  const count = sourceEntries.length;
+  const label =
+    count === 1 ? sourceEntries[0].name.replace(/\.md$/, "") : `${count} items`;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[100]">
@@ -32,9 +35,7 @@ export function DragOverlay({
           top: currentY - 12,
         }}
       >
-        <span className="truncate">
-          {sourceEntry.name.replace(/\.md$/, "")}
-        </span>
+        <span className="truncate">{label}</span>
       </div>
 
       {dropTarget && (

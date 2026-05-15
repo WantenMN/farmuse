@@ -6,6 +6,7 @@ import { FileExplorerEntry } from "../../hooks/useFileExplorer";
 interface FileExplorerItemProps {
   entry: FileExplorerEntry;
   isFocused: boolean;
+  isSelected?: boolean;
   isExpanded: boolean;
   isCut?: boolean;
   isDragging?: boolean;
@@ -22,6 +23,7 @@ interface FileExplorerItemProps {
 export function FileExplorerItem({
   entry,
   isFocused,
+  isSelected,
   isExpanded,
   isCut,
   isDragging,
@@ -54,7 +56,8 @@ export function FileExplorerItem({
       className={cn(
         "group relative flex cursor-pointer items-center gap-1 rounded-sm px-1.5 py-0.5 text-sm transition-none",
         isFocused && "bg-accent text-accent-foreground z-10",
-        !isFocused && "hover:bg-accent/30",
+        !isFocused && isSelected && "bg-accent/50 text-accent-foreground",
+        !isFocused && !isSelected && "hover:bg-accent/30",
         isCut && "opacity-50 grayscale-[0.5]",
         isDragging && "opacity-40"
       )}

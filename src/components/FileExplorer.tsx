@@ -121,7 +121,10 @@ export function FileExplorer({
     entries,
     expandedPaths,
     focusedIndex,
+    focusedPath,
     setFocusedPath,
+    selectedPaths,
+    setSelectedPaths,
     isActive,
     setIsActive,
     toggleFolder,
@@ -215,24 +218,34 @@ export function FileExplorer({
   );
 
   const handleDragMove = React.useCallback(
-    async (sourcePath: string, targetDir: string) => {
+    async (sourcePaths: string[], targetDir: string) => {
       const finalTargetDir = targetDir || currentPath || "";
-      const normalizedSource = normalizePath(sourcePath);
       const normalizedTarget = normalizePath(finalTargetDir);
-      const sourceParent = normalizedSource.substring(
-        0,
-        normalizedSource.lastIndexOf("/")
-      );
 
-      if (sourceParent === normalizedTarget) return;
+      const pathsToMove = sourcePaths.filter((sourcePath) => {
+        const normalizedSource = normalizePath(sourcePath);
+        const sourceParent = normalizedSource.substring(
+          0,
+          normalizedSource.lastIndexOf("/")
+        );
+        return sourceParent !== normalizedTarget;
+      });
+
+      if (pathsToMove.length === 0) return;
 
       try {
-        const resultPath = await invoke<string>("move_item", {
-          at: sourcePath,
-          toDir: finalTargetDir,
-        });
-        onFileMoved?.(sourcePath, resultPath);
-        await revealAndFocus(resultPath);
+        let lastResultPath: string | null = null;
+        for (const sourcePath of pathsToMove) {
+          const resultPath = await invoke<string>("move_item", {
+            at: sourcePath,
+            toDir: finalTargetDir,
+          });
+          onFileMoved?.(sourcePath, resultPath);
+          lastResultPath = resultPath;
+        }
+        if (lastResultPath) {
+          await revealAndFocus(lastResultPath);
+        }
       } catch (e) {
         console.error("Failed to move via drag", e);
       }
@@ -528,10 +541,12 @@ export function FileExplorer({
 
   const handleEmptyAreaClick = () => {
     setFocusedPath(null);
+    setSelectedPaths(new Set());
   };
 
   const handleEmptyAreaContextMenu = () => {
     setFocusedPath(null);
+    setSelectedPaths(new Set());
   };
 
   useFileExplorerCommands({
@@ -910,26 +925,77 @@ export function FileExplorer({
                                 <FileExplorerItem
                                   entry={entry}
                                   isFocused={index === focusedIndex}
+                                  isSelected={selectedPaths.has(entry.path)}
                                   isExpanded={expandedPaths.has(entry.path)}
                                   isCut={cutPath === entry.path}
                                   isDragging={
                                     dragState?.isDragging &&
-                                    dragState.sourceEntry.path === entry.path
+                                    dragState.sourceEntries.some(
+                                      (s) => s.path === entry.path
+                                    )
                                   }
                                   isEditing={editingItem?.path === entry.path}
                                   editName={editName}
                                   onEditChange={setEditName}
                                   onEditSubmit={handleRename}
                                   onEditCancel={() => setEditingItem(null)}
-                                  onMouseDown={(e) => handleMouseDown(e, entry)}
+                                  onMouseDown={(e) => {
+                                    const paths =
+                                      selectedPaths.size > 1 &&
+                                      selectedPaths.has(entry.path)
+                                        ? Array.from(selectedPaths)
+                                        : [entry.path];
+                                    const sources = paths
+                                      .map((p) =>
+                                        entries.find((en) => en.path === p)
+                                      )
+                                      .filter(
+                                        (en): en is FileExplorerEntry =>
+                                          en !== undefined
+                                      );
+                                    handleMouseDown(e, sources);
+                                  }}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setFocusedPath(entry.path);
                                     setIsActive(true);
-                                    if (entry.is_dir) {
-                                      toggleFolder(index);
+                                    if (e.ctrlKey || e.metaKey) {
+                                      setSelectedPaths((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(entry.path)) {
+                                          next.delete(entry.path);
+                                        } else {
+                                          next.add(entry.path);
+                                        }
+                                        return next;
+                                      });
+                                      setFocusedPath(entry.path);
+                                    } else if (e.shiftKey && focusedPath) {
+                                      const startIdx = entries.findIndex(
+                                        (en) =>
+                                          en.path.replace(/\\/g, "/") ===
+                                          focusedPath.replace(/\\/g, "/")
+                                      );
+                                      const endIdx = index;
+                                      if (startIdx !== -1) {
+                                        const [lo, hi] =
+                                          startIdx < endIdx
+                                            ? [startIdx, endIdx]
+                                            : [endIdx, startIdx];
+                                        const range = new Set<string>();
+                                        for (let i = lo; i <= hi; i++) {
+                                          range.add(entries[i].path);
+                                        }
+                                        setSelectedPaths(range);
+                                      }
+                                      setFocusedPath(entry.path);
                                     } else {
-                                      onOpenFile(entry.path, entry.name);
+                                      setSelectedPaths(new Set([entry.path]));
+                                      setFocusedPath(entry.path);
+                                      if (entry.is_dir) {
+                                        toggleFolder(index);
+                                      } else {
+                                        onOpenFile(entry.path, entry.name);
+                                      }
                                     }
                                   }}
                                 />
