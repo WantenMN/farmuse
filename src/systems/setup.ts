@@ -8,6 +8,7 @@ export function setupSystems() {
   // Global Keybindings
   keyboardManager.bind("alt+x", "open-command-palette");
   keyboardManager.bind("ctrl+p", "open-quick-open");
+  keyboardManager.bind("ctrl+w", "close-file");
   keyboardManager.bind("ctrl+shift+p", "open-recent-files");
   keyboardManager.bind("j", "explorer.moveDown");
   keyboardManager.bind("k", "explorer.moveUp");
