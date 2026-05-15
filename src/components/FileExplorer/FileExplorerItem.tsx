@@ -55,9 +55,10 @@ export function FileExplorerItem({
       data-entry-path={entry.path}
       className={cn(
         "group relative flex cursor-pointer items-center gap-1 rounded-sm px-1.5 py-0.5 text-sm transition-none",
-        isFocused && "bg-accent text-accent-foreground z-10",
-        !isFocused && isSelected && "bg-accent/50 text-accent-foreground",
-        !isFocused && !isSelected && "hover:bg-accent/30",
+        isFocused &&
+          "bg-explorer-focus text-foreground ring-primary/20 z-10 ring-1 ring-inset",
+        !isFocused && isSelected && "bg-explorer-selected text-foreground",
+        !isFocused && !isSelected && "hover:bg-explorer-hover",
         isCut && "opacity-50 grayscale-[0.5]",
         isDragging && "opacity-40"
       )}

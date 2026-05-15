@@ -28,6 +28,10 @@
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
 
+  --color-explorer-hover: var(--explorer-hover);
+  --color-explorer-selected: var(--explorer-selected);
+  --color-explorer-focus: var(--explorer-focus);
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -75,6 +79,10 @@
     --input: hsl(240 5.9% 90%);
     --ring: hsl(240 10% 3.9%);
     --radius: 0.5rem;
+
+    --explorer-hover: hsl(217 60% 96%);
+    --explorer-selected: hsl(217 55% 92%);
+    --explorer-focus: hsl(217 50% 88%);
   }
 
   .dark {
@@ -97,6 +105,10 @@
     --border: hsl(240 3.7% 15.9%);
     --input: hsl(240 3.7% 15.9%);
     --ring: hsl(240 4.9% 83.9%);
+
+    --explorer-hover: hsl(217 30% 16%);
+    --explorer-selected: hsl(217 35% 20%);
+    --explorer-focus: hsl(217 40% 25%);
   }
 }
 
