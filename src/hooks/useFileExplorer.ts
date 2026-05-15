@@ -202,6 +202,27 @@ export function useFileExplorer(
     [entries, expandedPaths, refreshTree]
   );
 
+  const expandFolderAll = React.useCallback(
+    async (folderPath: string) => {
+      if (!currentPath) return;
+      try {
+        const allDirs = await invoke<string[]>("list_all_subdirs", {
+          path: folderPath,
+        });
+        const newExpanded = new Set(expandedPaths);
+        newExpanded.add(folderPath.replace(/\\/g, "/"));
+        for (const dir of allDirs) {
+          newExpanded.add(dir.replace(/\\/g, "/"));
+        }
+        setExpandedPaths(newExpanded);
+        await refreshTree(newExpanded);
+      } catch (e) {
+        console.error("Failed to expand folder all", e);
+      }
+    },
+    [currentPath, expandedPaths, refreshTree]
+  );
+
   return {
     entries,
     expandedPaths,
@@ -214,6 +235,7 @@ export function useFileExplorer(
     isActive,
     setIsActive,
     toggleFolder,
+    expandFolderAll,
     refreshTree,
     setExpandedPaths,
     setEntries,

@@ -9,7 +9,6 @@ import {
   FilePlus,
   FolderPlus,
   ChevronsDownUp,
-  ChevronsUpDown,
   ListTree,
   Edit2,
   Copy,
@@ -19,6 +18,7 @@ import {
   Scissors,
   ClipboardPaste,
   Trash2,
+  UnfoldVertical,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { commandManager } from "../systems/commandManager";
@@ -128,6 +128,7 @@ export function FileExplorer({
     isActive,
     setIsActive,
     toggleFolder,
+    expandFolderAll,
     refreshTree,
     setExpandedPaths,
   } = useFileExplorer(currentPath, rootEntries);
@@ -536,23 +537,23 @@ export function FileExplorer({
     await writeText(textToCopy);
   };
 
-  const toggleExpandAll = async () => {
+  const expandAll = async () => {
     if (!currentPath) return;
-    if (expandedPaths.size > 0) {
-      setExpandedPaths(new Set());
-      await refreshTree(new Set());
-    } else {
-      try {
-        const allDirs = await invoke<string[]>("list_all_subdirs", {
-          path: currentPath,
-        });
-        const newExpanded = new Set(allDirs.map(normalizePath));
-        setExpandedPaths(newExpanded);
-        await refreshTree(newExpanded, true);
-      } catch (e) {
-        console.error("Failed to expand all", e);
-      }
+    try {
+      const allDirs = await invoke<string[]>("list_all_subdirs", {
+        path: currentPath,
+      });
+      const newExpanded = new Set(allDirs.map(normalizePath));
+      setExpandedPaths(newExpanded);
+      await refreshTree(newExpanded, true);
+    } catch (e) {
+      console.error("Failed to expand all", e);
     }
+  };
+
+  const collapseAll = async () => {
+    setExpandedPaths(new Set());
+    await refreshTree(new Set());
   };
 
   const handleEmptyAreaClick = () => {
@@ -671,6 +672,23 @@ export function FileExplorer({
           <ContextMenuItem onClick={() => startCreate("folder", entry)}>
             <FolderPlus className="mr-2 h-4 w-4" />
             New Folder
+          </ContextMenuItem>
+        </ContextMenuGroup>
+      );
+    }
+
+    // Group 1.5: Expand All
+    if (isFolder || isEmpty) {
+      if (items.length > 0) items.push(<ContextMenuSeparator key="sep0.5" />);
+      items.push(
+        <ContextMenuGroup key="expandAll">
+          <ContextMenuItem
+            onClick={() =>
+              isFolder ? expandFolderAll(entry.path) : expandAll()
+            }
+          >
+            <UnfoldVertical className="mr-2 h-4 w-4" />
+            {isFolder ? "Expand All Subfolders" : "Expand All"}
           </ContextMenuItem>
         </ContextMenuGroup>
       );
@@ -863,16 +881,12 @@ export function FileExplorer({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    toggleExpandAll();
+                    collapseAll();
                   }}
                   className="text-muted-foreground hover:bg-accent cursor-pointer rounded p-1 transition-colors"
-                  title={expandedPaths.size > 0 ? "Collapse All" : "Expand All"}
+                  title="Collapse All"
                 >
-                  {expandedPaths.size > 0 ? (
-                    <ChevronsDownUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronsUpDown className="h-4 w-4" />
-                  )}
+                  <ChevronsDownUp className="h-4 w-4" />
                 </button>
               </div>
             </FileExplorerHeader>
