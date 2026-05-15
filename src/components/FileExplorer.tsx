@@ -33,7 +33,11 @@ import {
 } from "./ui/context-menu";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { useFileStore } from "../store/fileStore";
+import {
+  useFileStore,
+  encodeMultiPaths,
+  decodeMultiPaths,
+} from "../store/fileStore";
 import {
   Dialog,
   DialogContent,
@@ -146,8 +150,14 @@ export function FileExplorer({
   React.useEffect(() => {
     if (!entries.length) return;
     const paths = new Set(entries.map((e) => normalizePath(e.path)));
-    if (copyPath && !paths.has(normalizePath(copyPath))) setCopyPath(null);
-    if (cutPath && !paths.has(normalizePath(cutPath))) setCutPath(null);
+    if (copyPath) {
+      const cps = decodeMultiPaths(copyPath);
+      if (cps.some((p) => !paths.has(normalizePath(p)))) setCopyPath(null);
+    }
+    if (cutPath) {
+      const cts = decodeMultiPaths(cutPath);
+      if (cts.some((p) => !paths.has(normalizePath(p)))) setCutPath(null);
+    }
   }, [entries, copyPath, cutPath, setCopyPath, setCutPath]);
 
   const [isExpanded, setIsExpanded] = React.useState(true);
@@ -180,8 +190,18 @@ export function FileExplorer({
 
   const [deleteConfirmItem, setDeleteConfirmItem] =
     React.useState<FileExplorerEntry | null>(null);
+  const [multiDeleteItems, setMultiDeleteItems] = React.useState<
+    FileExplorerEntry[]
+  >([]);
 
   const normalizePath = (path: string) => path.replace(/\\/g, "/");
+
+  const cutPathSet = React.useMemo(
+    () => new Set(decodeMultiPaths(cutPath).map(normalizePath)),
+    [cutPath]
+  );
+
+  const deletePendingRef = React.useRef(false);
 
   const expandedPathsRef = React.useRef(expandedPaths);
   expandedPathsRef.current = expandedPaths;
@@ -256,13 +276,29 @@ export function FileExplorer({
           resultPaths.sort((a, b) =>
             a.replace(/\\/g, "/").localeCompare(b.replace(/\\/g, "/"))
           );
+
+          // Expand target folder if collapsed
+          let currentExpanded = expandedPathsRef.current;
+          if (!currentExpanded.has(normalizedTarget)) {
+            currentExpanded = new Set(currentExpanded);
+            currentExpanded.add(normalizedTarget);
+            setExpandedPaths(currentExpanded);
+          }
+
           await revealAndFocus(resultPaths[0]);
+          setSelectedPaths(new Set(resultPaths));
         }
       } catch (e) {
         console.error("Failed to move via drag", e);
       }
     },
-    [onFileMoved, revealAndFocus, currentPath]
+    [
+      onFileMoved,
+      revealAndFocus,
+      currentPath,
+      setExpandedPaths,
+      setSelectedPaths,
+    ]
   );
 
   const { dragState, handleMouseDown } = useDragDrop({
@@ -460,15 +496,26 @@ export function FileExplorer({
   };
 
   const handleDelete = async () => {
-    if (!deleteConfirmItem) return;
+    const items =
+      multiDeleteItems.length > 0
+        ? multiDeleteItems
+        : deleteConfirmItem
+          ? [deleteConfirmItem]
+          : [];
+    if (items.length === 0) return;
     try {
-      await invoke("remove_to_trash", { path: deleteConfirmItem.path });
-      if (!deleteConfirmItem.is_dir) {
-        onFileDeleted?.(deleteConfirmItem.path);
+      for (const item of items) {
+        await invoke("remove_to_trash", { path: item.path });
+        if (!item.is_dir) {
+          onFileDeleted?.(item.path);
+        }
+        if (copyPath === item.path) setCopyPath(null);
+        if (cutPath === item.path) setCutPath(null);
       }
-      if (copyPath === deleteConfirmItem.path) setCopyPath(null);
-      if (cutPath === deleteConfirmItem.path) setCutPath(null);
+      deletePendingRef.current = false;
       setDeleteConfirmItem(null);
+      setMultiDeleteItems([]);
+      setSelectedPaths(new Set());
       await refreshTree(expandedPaths);
     } catch (e) {
       console.error("Failed to delete", e);
@@ -476,41 +523,65 @@ export function FileExplorer({
   };
 
   const handlePaste = async (targetDir: string) => {
-    if (cutPath) {
-      const normalizedCutPath = normalizePath(cutPath);
-      const normalizedTargetDir = normalizePath(targetDir);
-      const lastSlash = normalizedCutPath.lastIndexOf("/");
-      const cutPathDir =
-        lastSlash !== -1 ? normalizedCutPath.substring(0, lastSlash) : "";
+    const normalizedTargetDir = normalizePath(targetDir);
 
-      if (
-        normalizedCutPath === normalizedTargetDir ||
-        cutPathDir === normalizedTargetDir
-      ) {
+    // Expand target folder if collapsed
+    let currentExpanded = expandedPaths;
+    if (!expandedPaths.has(normalizedTargetDir)) {
+      currentExpanded = new Set(expandedPaths);
+      currentExpanded.add(normalizedTargetDir);
+      setExpandedPaths(currentExpanded);
+    }
+
+    if (cutPath) {
+      const paths = decodeMultiPaths(cutPath);
+      const validPaths = paths.filter((p) => {
+        const normalized = normalizePath(p);
+        const lastSlash = normalized.lastIndexOf("/");
+        const parentDir =
+          lastSlash !== -1 ? normalized.substring(0, lastSlash) : "";
+        return (
+          normalized !== normalizedTargetDir &&
+          parentDir !== normalizedTargetDir
+        );
+      });
+
+      if (validPaths.length === 0) {
         setCutPath(null);
         return;
       }
 
       try {
-        const resultPath = await invoke<string>("move_item", {
-          at: cutPath,
-          toDir: targetDir,
-        });
-        onFileMoved?.(cutPath, resultPath);
+        const resultPaths: string[] = [];
+        for (const p of validPaths) {
+          const result = await invoke<string>("move_item", {
+            at: p,
+            toDir: targetDir,
+          });
+          onFileMoved?.(p, result);
+          resultPaths.push(result);
+        }
         setCutPath(null);
-        await refreshTree(expandedPaths);
-        setFocusedPath(resultPath);
+        await refreshTree(currentExpanded);
+        setSelectedPaths(new Set(resultPaths));
+        setFocusedPath(resultPaths[resultPaths.length - 1]);
       } catch (e) {
         console.error("Failed to paste", e);
       }
     } else if (copyPath) {
       try {
-        const resultPath = await invoke<string>("copy_item", {
-          at: copyPath,
-          toDir: targetDir,
-        });
-        await refreshTree(expandedPaths);
-        setFocusedPath(resultPath);
+        const paths = decodeMultiPaths(copyPath);
+        const resultPaths: string[] = [];
+        for (const p of paths) {
+          const result = await invoke<string>("copy_item", {
+            at: p,
+            toDir: targetDir,
+          });
+          resultPaths.push(result);
+        }
+        await refreshTree(currentExpanded);
+        setSelectedPaths(new Set(resultPaths));
+        setFocusedPath(resultPaths[resultPaths.length - 1]);
       } catch (e) {
         console.error("Failed to copy", e);
       }
@@ -557,12 +628,14 @@ export function FileExplorer({
   };
 
   const handleEmptyAreaClick = () => {
+    if (deletePendingRef.current) return;
     setFocusedPath(null);
     setSelectedPaths(new Set());
     anchorPathRef.current = null;
   };
 
   const handleEmptyAreaContextMenu = () => {
+    if (deletePendingRef.current) return;
     setFocusedPath(null);
     setSelectedPaths(new Set());
     anchorPathRef.current = null;
@@ -589,17 +662,30 @@ export function FileExplorer({
       }
     },
     onDelete: () => {
-      if (focusedIndex !== -1) {
+      if (selectedPaths.size > 1) {
+        const items = entries.filter((e) => selectedPaths.has(e.path));
+        if (items.length > 0) setMultiDeleteItems(items);
+      } else if (focusedIndex !== -1) {
         setDeleteConfirmItem(entries[focusedIndex]);
       }
     },
     onCut: () => {
-      if (focusedIndex !== -1) {
+      if (selectedPaths.size > 1) {
+        const paths = entries
+          .filter((e) => selectedPaths.has(e.path))
+          .map((e) => e.path);
+        setCutPath(encodeMultiPaths(paths));
+      } else if (focusedIndex !== -1) {
         setCutPath(entries[focusedIndex].path);
       }
     },
     onCopy: () => {
-      if (focusedIndex !== -1) {
+      if (selectedPaths.size > 1) {
+        const paths = entries
+          .filter((e) => selectedPaths.has(e.path))
+          .map((e) => e.path);
+        setCopyPath(encodeMultiPaths(paths));
+      } else if (focusedIndex !== -1) {
         setCopyPath(entries[focusedIndex].path);
       }
     },
@@ -656,6 +742,50 @@ export function FileExplorer({
     const isFolder = entry && entry.is_dir;
     const isEmpty = !entry;
     const hasPaste = !!((cutPath || copyPath) && (isFolder || isEmpty));
+    const isMulti =
+      entry && selectedPaths.size > 1 && selectedPaths.has(entry.path);
+
+    // Multi-select context menu: only Copy, Cut, Delete
+    if (isMulti) {
+      const selectedEntries = entries.filter((e) => selectedPaths.has(e.path));
+      return (
+        <ContextMenuContent className="w-56">
+          <ContextMenuGroup key="clipboard">
+            <ContextMenuItem
+              onClick={() =>
+                setCopyPath(
+                  encodeMultiPaths(selectedEntries.map((e) => e.path))
+                )
+              }
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Copy
+            </ContextMenuItem>
+            <ContextMenuItem
+              onClick={() =>
+                setCutPath(encodeMultiPaths(selectedEntries.map((e) => e.path)))
+              }
+            >
+              <Scissors className="mr-2 h-4 w-4" />
+              Cut
+            </ContextMenuItem>
+          </ContextMenuGroup>
+          <ContextMenuSeparator />
+          <ContextMenuGroup key="delete">
+            <ContextMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => {
+                deletePendingRef.current = true;
+                setMultiDeleteItems(selectedEntries);
+              }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </ContextMenuItem>
+          </ContextMenuGroup>
+        </ContextMenuContent>
+      );
+    }
 
     // Groups are rendered only if they have content.
     // Separators are rendered only if there's content before them.
@@ -948,7 +1078,9 @@ export function FileExplorer({
                             onOpenChange={(open) => {
                               if (open) {
                                 setFocusedPath(entry.path);
-                                setSelectedPaths(new Set([entry.path]));
+                                if (!selectedPaths.has(entry.path)) {
+                                  setSelectedPaths(new Set([entry.path]));
+                                }
                                 setIsActive(true);
                               }
                             }}
@@ -958,7 +1090,9 @@ export function FileExplorer({
                                 onContextMenu={(e) => {
                                   e.stopPropagation();
                                   setFocusedPath(entry.path);
-                                  setSelectedPaths(new Set([entry.path]));
+                                  if (!selectedPaths.has(entry.path)) {
+                                    setSelectedPaths(new Set([entry.path]));
+                                  }
                                   setIsActive(true);
                                 }}
                               >
@@ -967,7 +1101,9 @@ export function FileExplorer({
                                   isFocused={index === focusedIndex}
                                   isSelected={selectedPaths.has(entry.path)}
                                   isExpanded={expandedPaths.has(entry.path)}
-                                  isCut={cutPath === entry.path}
+                                  isCut={cutPathSet.has(
+                                    normalizePath(entry.path)
+                                  )}
                                   isDragging={
                                     dragState?.isDragging &&
                                     dragState.sourceEntries.some(
@@ -1074,24 +1210,46 @@ export function FileExplorer({
       </ContextMenu>
 
       <Dialog
-        open={!!deleteConfirmItem}
-        onOpenChange={(open) => !open && setDeleteConfirmItem(null)}
+        open={!!deleteConfirmItem || multiDeleteItems.length > 0}
+        onOpenChange={(open) => {
+          if (!open) {
+            deletePendingRef.current = false;
+            setDeleteConfirmItem(null);
+            setMultiDeleteItems([]);
+          }
+        }}
       >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Are you sure?</DialogTitle>
             <DialogDescription>
-              This will move{" "}
-              <span className="text-foreground font-semibold">
-                {deleteConfirmItem?.name}
-              </span>{" "}
-              to the trash.
+              {multiDeleteItems.length > 0 ? (
+                <>
+                  This will move{" "}
+                  <span className="text-foreground font-semibold">
+                    {multiDeleteItems.length}
+                  </span>{" "}
+                  items to the trash.
+                </>
+              ) : (
+                <>
+                  This will move{" "}
+                  <span className="text-foreground font-semibold">
+                    {deleteConfirmItem?.name}
+                  </span>{" "}
+                  to the trash.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setDeleteConfirmItem(null)}
+              onClick={() => {
+                deletePendingRef.current = false;
+                setDeleteConfirmItem(null);
+                setMultiDeleteItems([]);
+              }}
             >
               Cancel
             </Button>
