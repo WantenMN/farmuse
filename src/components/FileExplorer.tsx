@@ -629,6 +629,12 @@ export function FileExplorer({
     return () => commandManager.unregister("explorer.revealActiveFile");
   }, [activeFilePath, isAutoReveal, revealFile]);
 
+  React.useEffect(() => {
+    if (isAutoReveal && activeFilePath) {
+      revealFile(activeFilePath, true);
+    }
+  }, [isAutoReveal]);
+
   // Scroll focused item into view
   React.useEffect(() => {
     if (
