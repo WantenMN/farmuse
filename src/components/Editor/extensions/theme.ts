@@ -61,9 +61,12 @@ export const getEditorTheme = (fontSize: number) =>
       overflow: "auto",
       fontFamily:
         "var(--font-sans, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif)",
-      scrollbarGutter: "stable",
       paddingTop: "2.5rem",
       paddingBottom: "50vh",
+      scrollbarWidth: "none",
+      "&::-webkit-scrollbar": {
+        display: "none",
+      },
     },
     ".cm-gutters": {
       gridColumn: "1",

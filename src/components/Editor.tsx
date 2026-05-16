@@ -8,6 +8,7 @@ import { EditorLoadingState } from "./Editor/EditorLoadingState";
 import { EditorErrorState } from "./Editor/EditorErrorState";
 import { EditorStatusBar, type EditorMode } from "./Editor/EditorStatusBar";
 import { getDefaultExtensions } from "./Editor/CodeMirrorConfig";
+import { CustomScrollbar } from "./CustomScrollbar";
 
 interface EditorProps {
   path: string | null;
@@ -27,6 +28,7 @@ export function Editor({
 
   const [mode, setMode] = React.useState<EditorMode>("live");
   const editorRef = React.useRef<HTMLDivElement>(null);
+  const scrollDomRef = React.useRef<HTMLElement | null>(null);
 
   const extensions = React.useMemo(() => {
     return getDefaultExtensions(
@@ -39,12 +41,20 @@ export function Editor({
     );
   }, [setContent, mode, fontSize, showLineNumbers]);
 
-  useCodeMirror({
+  const { view } = useCodeMirror({
     container: editorRef,
     value: content || "",
     extensions,
-    autoFocus: false, // Don't steal focus on mount
+    autoFocus: false,
   });
+
+  React.useEffect(() => {
+    if (view) {
+      scrollDomRef.current = view.scrollDOM;
+    } else {
+      scrollDomRef.current = null;
+    }
+  }, [view]);
 
   if (!path) return <EditorEmptyState />;
 
@@ -57,6 +67,7 @@ export function Editor({
         />
         {loading && <EditorLoadingState name={name} />}
         {error && <EditorErrorState error={error} />}
+        <CustomScrollbar containerRef={scrollDomRef} />
       </div>
       <EditorStatusBar
         isSaving={isSaving}

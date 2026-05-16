@@ -23,6 +23,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { commandManager } from "../systems/commandManager";
 import { Virtuoso } from "react-virtuoso";
+import { CustomScrollbar } from "./CustomScrollbar";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -164,6 +165,7 @@ export function FileExplorer({
   const prevFocusedIndexRef = React.useRef<number>(-1);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   const virtuosoRef = React.useRef(null);
+  const scrollerElRef = React.useRef<HTMLElement | null>(null);
 
   const [isAutoReveal, setIsAutoReveal] = React.useState(() => {
     const saved = localStorage.getItem("explorer_auto_reveal");
@@ -1029,7 +1031,7 @@ export function FileExplorer({
             >
               <div
                 ref={scrollContainerRef}
-                className="flex-1 overflow-hidden px-1 outline-none"
+                className="relative flex-1 overflow-hidden pr-0 pl-1 outline-none"
                 tabIndex={0}
                 onFocus={() => setIsActive(true)}
                 onBlur={() => setIsActive(false)}
@@ -1060,8 +1062,11 @@ export function FileExplorer({
                     )}
                     <Virtuoso
                       ref={virtuosoRef}
+                      scrollerRef={(el) => {
+                        scrollerElRef.current = el as HTMLElement | null;
+                      }}
                       data={entries}
-                      className="scrollbar-hide virtuoso-scroller h-full"
+                      className="hide-native-scrollbar h-full"
                       itemContent={(index, entry) => (
                         <div className="space-y-px">
                           {newItem && newItem.insertIndex === index && (
@@ -1200,6 +1205,7 @@ export function FileExplorer({
                         </div>
                       )}
                     />
+                    <CustomScrollbar containerRef={scrollerElRef} />
                   </>
                 )}
               </div>

@@ -128,3 +128,12 @@
     display: none;
   }
 }
+
+/* Hide native scrollbar while keeping overflow scrollable */
+.hide-native-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
