@@ -52,7 +52,6 @@ export function QuickOpen({ onOpenFile, currentPath }: QuickOpenProps) {
     };
   }, []);
 
-  // Load recent files when dialog opens
   React.useEffect(() => {
     if (open) {
       const saved = JSON.parse(

@@ -46,7 +46,6 @@ export function useDragDrop({
   const dragStateRef = React.useRef<DragState | null>(null);
   const onMoveRef = React.useRef(onMove);
 
-  // Keep refs in sync
   dragStateRef.current = dragState;
   onMoveRef.current = onMove;
 
@@ -161,7 +160,6 @@ export function useDragDrop({
     return "";
   }, []);
 
-  // Auto scroll logic
   const startAutoScroll = React.useCallback(
     (clientY: number) => {
       clearAutoScroll();
@@ -188,7 +186,6 @@ export function useDragDrop({
     [scrollContainerRef, clearAutoScroll]
   );
 
-  // Folder expand logic
   const handleFolderExpand = React.useCallback(
     (target: DropTarget | null) => {
       if (
@@ -257,7 +254,6 @@ export function useDragDrop({
     clearExpandTimer();
   }, [isValidMove, getTargetDir, clearAutoScroll, clearExpandTimer]);
 
-  // RAF-based drag update loop
   React.useEffect(() => {
     if (!dragState) return;
 
@@ -305,7 +301,6 @@ export function useDragDrop({
     };
   }, [dragState !== null, calculateDropTarget]);
 
-  // Register global mouse events when dragging
   React.useEffect(() => {
     if (dragState) {
       window.addEventListener("mousemove", handleMouseMove);
@@ -324,14 +319,12 @@ export function useDragDrop({
     }
   }, [dragState, handleMouseMove, handleMouseUp, startAutoScroll]);
 
-  // Handle folder expand when dropTarget changes
   React.useEffect(() => {
     if (dragState?.isDragging) {
       handleFolderExpand(dragState.dropTarget);
     }
   }, [dragState?.isDragging, dragState?.dropTarget, handleFolderExpand]);
 
-  // Cleanup on unmount
   React.useEffect(() => {
     return () => {
       clearAutoScroll();

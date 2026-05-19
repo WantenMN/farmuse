@@ -71,7 +71,6 @@ impl DbManager {
     }
 
     pub async fn upsert_entry(&self, path: &str, name: &str, is_dir: bool, mtime: i64, root: &str) -> Result<(), String> {
-        // Normalize to forward slashes for cross-platform consistency
         let normalized_path = path.replace("\\", "/");
         let normalized_root = root.replace("\\", "/");
         sqlx::query(
@@ -223,7 +222,6 @@ impl DbManager {
         let old_normalized = old_path.replace("\\", "/");
         let new_normalized = new_path.replace("\\", "/");
 
-        // Find workspace root
         let root_row = sqlx::query("SELECT root FROM all_entries WHERE path = ?1")
             .bind(&old_normalized)
             .fetch_optional(&self.pool)
@@ -235,7 +233,6 @@ impl DbManager {
             None => return Ok(()),
         };
 
-        // Remove old entry + all children
         self.remove_by_prefix(&old_normalized).await?;
 
         let mtime = std::time::SystemTime::now()
@@ -243,10 +240,8 @@ impl DbManager {
             .map(|d| d.as_secs() as i64)
             .unwrap_or(0);
 
-        // Insert the moved entry itself
         self.upsert_entry(&new_normalized, new_name, is_dir, mtime, &workspace_root).await?;
 
-        // If directory, re-index from filesystem
         if is_dir {
             self.reindex_directory(new_path, &workspace_root).await?;
         }

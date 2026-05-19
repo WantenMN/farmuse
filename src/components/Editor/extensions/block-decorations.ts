@@ -21,9 +21,6 @@ interface LineInfo {
   quote?: boolean;
 }
 
-/**
- * Handle FencedCode line decorations
- */
 function handleFencedCode(
   node: SyntaxNodeRef,
   doc: Text,
@@ -46,9 +43,6 @@ function handleFencedCode(
   }
 }
 
-/**
- * Handle Blockquote line decorations
- */
 function handleBlockquote(
   node: SyntaxNodeRef,
   doc: Text,

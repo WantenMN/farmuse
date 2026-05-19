@@ -1,8 +1,5 @@
 import { commandManager } from "./systems/commandManager";
 
-/**
- * Register global commands that don't depend on specific component state
- */
 export function registerGlobalCommands() {
   commandManager.register({
     id: "reload-app",
@@ -69,9 +66,6 @@ export function registerGlobalCommands() {
   });
 }
 
-/**
- * Commands specifically for the App component that require its state
- */
 export function registerAppCommands(handlers: {
   toggleExplorer: () => void;
   closeFolder: () => void;
@@ -123,9 +117,6 @@ export function registerAppCommands(handlers: {
   });
 }
 
-/**
- * Metadata for commands registered by components
- */
 export const COMMAND_METADATA = {
   OPEN_FOLDER: {
     id: "open-folder",
@@ -139,9 +130,6 @@ export const COMMAND_METADATA = {
   },
 };
 
-/**
- * Unregister app commands
- */
 export function unregisterAppCommands() {
   commandManager.unregister("toggle-explorer");
   commandManager.unregister("close-folder");

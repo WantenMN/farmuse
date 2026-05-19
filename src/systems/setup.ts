@@ -1,11 +1,7 @@
 import { keyboardManager } from "./keyboardManager";
 import { registerGlobalCommands } from "../commands";
 
-/**
- * Initialize global system bindings and commands
- */
 export function setupSystems() {
-  // Global Keybindings
   keyboardManager.bind("alt+x", "open-command-palette");
   keyboardManager.bind("ctrl+p", "open-quick-open");
   keyboardManager.bind("ctrl+w", "close-file");
@@ -20,6 +16,5 @@ export function setupSystems() {
   keyboardManager.bind("arrowleft", "explorer.collapse");
   keyboardManager.bind("arrowright", "explorer.expand");
 
-  // Register all global commands from the unified command file
   registerGlobalCommands();
 }

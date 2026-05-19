@@ -73,7 +73,6 @@ export function RecentFilesPage({
     setConfirmClear(false);
   };
 
-  // Reset confirmation state when clicking elsewhere
   React.useEffect(() => {
     const handleClickOutside = () => {
       setConfirmingPath(null);

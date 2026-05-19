@@ -12,13 +12,9 @@ export function CustomScrollbar({ containerRef }: CustomScrollbarProps) {
   const dragStartScrollTopRef = React.useRef(0);
 
   const [el, setEl] = React.useState<HTMLElement | null>(null);
-  // Ref-backed copy for drag/hover handlers that can't read stale React state.
   const elRef = React.useRef<HTMLElement | null>(null);
   elRef.current = el;
 
-  // Sync el with containerRef.current. The ref object is stable across
-  // renders, so we can't use it as a dependency — read .current in an
-  // effect that runs after every render.
   React.useEffect(() => {
     const next = containerRef.current;
     if (next !== elRef.current) {
@@ -34,7 +30,6 @@ export function CustomScrollbar({ containerRef }: CustomScrollbarProps) {
   const lastMouseRef = React.useRef<{ x: number; y: number } | null>(null);
   const [ratio, setRatio] = React.useState({ top: 0, thumbHeight: 0 });
 
-  // Track scroll & overflow — update thumb via direct DOM for zero-lag
   const ratioRef = React.useRef(ratio);
   ratioRef.current = ratio;
 
@@ -57,8 +52,6 @@ export function CustomScrollbar({ containerRef }: CustomScrollbarProps) {
       const maxTT = clientHeight - th;
       const top = maxST > 0 ? (scrollTop / maxST) * maxTT : 0;
 
-      // When the scrollbar first appears, check if the mouse is already
-      // over the container so we show the correct hover state immediately.
       if (wasHidden && lastMouseRef.current) {
         const cr = el.getBoundingClientRect();
         const { x, y } = lastMouseRef.current;
@@ -72,16 +65,13 @@ export function CustomScrollbar({ containerRef }: CustomScrollbarProps) {
         setIsHoverTrack(onTrack);
       }
 
-      // Direct DOM update for the thumb — bypasses React render cycle
       if (thumbRef.current) {
         thumbRef.current.style.transform = `translateY(${top}px)`;
         thumbRef.current.style.height = `${th}px`;
       }
 
-      // Sync ratio ref for drag calculations
       ratioRef.current = { top, thumbHeight: th };
 
-      // Still update React state for initial render / overflow changes
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
         setRatio({ top, thumbHeight: th });
@@ -116,14 +106,12 @@ export function CustomScrollbar({ containerRef }: CustomScrollbarProps) {
     };
   }, [el]);
 
-  // Single mousemove handler for both drag and hover detection
   React.useEffect(() => {
     let hoverRaf = 0;
 
     const onMove = (e: MouseEvent) => {
       lastMouseRef.current = { x: e.clientX, y: e.clientY };
 
-      // Drag handling (ref-based, no React state needed)
       if (isDraggingRef.current && elRef.current) {
         const dy = e.clientY - dragStartYRef.current;
         const el = elRef.current;
@@ -137,7 +125,6 @@ export function CustomScrollbar({ containerRef }: CustomScrollbarProps) {
         return;
       }
 
-      // Hover detection — rAF throttled, two-zone tracking
       if (!elRef.current || ratioRef.current.thumbHeight === 0) return;
 
       cancelAnimationFrame(hoverRaf);

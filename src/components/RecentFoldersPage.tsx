@@ -30,9 +30,7 @@ export function RecentFoldersPage({
       setFolders(saved);
     } else {
       setFolders((prev) => {
-        // Keep existing ones in their order, but filter out removed ones
         const existing = prev.filter((p) => saved.includes(p));
-        // Add truly new ones at the top
         const added = saved.filter((p) => !prev.includes(p));
         return [...added, ...existing];
       });
@@ -60,33 +58,27 @@ export function RecentFoldersPage({
       return;
     }
 
-    // 1. Remove from database index
     try {
       await invoke("clear_root_index", { rootPath: path });
     } catch (e) {
       console.error("Failed to clear root index", e);
     }
 
-    // 2. Clear localStorage state for this folder
     localStorage.removeItem(`tabs_state_${path}`);
     localStorage.removeItem(`explorer_state_${path}`);
 
-    // 3. Update recent folders list
     const saved = JSON.parse(
       localStorage.getItem("farmuse_recent_folders") || "[]"
     ) as string[];
     const updated = saved.filter((p) => p !== path);
     localStorage.setItem("farmuse_recent_folders", JSON.stringify(updated));
 
-    // Notify other components (and ourselves via the effect)
     window.dispatchEvent(new CustomEvent("recent-folders-updated"));
 
-    // 4. Call parent handler to close if currently open
     onRemoveFolder(path);
     setConfirmingPath(null);
   };
 
-  // Reset confirmation state when clicking elsewhere
   React.useEffect(() => {
     const handleClickOutside = () => setConfirmingPath(null);
     window.addEventListener("click", handleClickOutside);

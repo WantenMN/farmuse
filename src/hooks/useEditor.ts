@@ -23,7 +23,6 @@ export function useEditor({ path, name }: UseEditorProps) {
     () => (path ? lastSavedContentCache.get(path) || null : null)
   );
 
-  // Load file content
   React.useEffect(() => {
     if (!path || contentCache.has(path)) {
       return;
@@ -52,7 +51,6 @@ export function useEditor({ path, name }: UseEditorProps) {
     loadFile();
   }, [path]);
 
-  // Update caches
   React.useEffect(() => {
     if (path && content !== null) {
       contentCache.set(path, content);
@@ -65,7 +63,6 @@ export function useEditor({ path, name }: UseEditorProps) {
     }
   }, [lastSavedContent, path]);
 
-  // Auto-save logic
   React.useEffect(() => {
     if (path === null || content === null || content === lastSavedContent)
       return;
@@ -86,7 +83,6 @@ export function useEditor({ path, name }: UseEditorProps) {
     return () => clearTimeout(timer);
   }, [content, path, lastSavedContent, name]);
 
-  // File watcher
   React.useEffect(() => {
     if (!path) return;
 

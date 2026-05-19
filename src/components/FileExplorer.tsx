@@ -279,7 +279,6 @@ export function FileExplorer({
             a.replace(/\\/g, "/").localeCompare(b.replace(/\\/g, "/"))
           );
 
-          // Expand target folder if collapsed
           let currentExpanded = expandedPathsRef.current;
           if (!currentExpanded.has(normalizedTarget)) {
             currentExpanded = new Set(currentExpanded);
@@ -310,7 +309,6 @@ export function FileExplorer({
     scrollContainerRef,
   });
 
-  // Listen for folder expand events during drag hover
   React.useEffect(() => {
     const handleDragExpand = async (e: Event) => {
       if (!dragState?.isDragging) return;
@@ -346,7 +344,6 @@ export function FileExplorer({
       let current = normalizedCurrent;
       let changed = false;
 
-      // Expand all parent directories
       for (let i = 0; i < parts.length - 1; i++) {
         const nextPart = parts[i];
         current = current.endsWith("/")
@@ -435,11 +432,8 @@ export function FileExplorer({
       if (targetEntry.is_dir) {
         parentPath = normalizePath(targetEntry.path);
         depth = targetEntry.depth + 1;
-        // Find insert index: after the directory and its children
         const index = entries.findIndex((e) => e.path === targetEntry.path);
         insertIndex = index + 1;
-        // If it's expanded, we should ideally insert after all visible children,
-        // but for simplicity we'll just refresh after creation.
       } else {
         const path = normalizePath(targetEntry.path);
         const lastSlash = path.lastIndexOf("/");
@@ -527,7 +521,6 @@ export function FileExplorer({
   const handlePaste = async (targetDir: string) => {
     const normalizedTargetDir = normalizePath(targetDir);
 
-    // Expand target folder if collapsed
     let currentExpanded = expandedPaths;
     if (!expandedPaths.has(normalizedTargetDir)) {
       currentExpanded = new Set(expandedPaths);
@@ -601,7 +594,6 @@ export function FileExplorer({
       }
     }
 
-    // Convert to platform specific path
     const isWindows = navigator.userAgent.includes("Windows");
     if (isWindows) {
       textToCopy = textToCopy.replace(/\//g, "\\");
@@ -724,7 +716,6 @@ export function FileExplorer({
     }
   }, [isAutoReveal]);
 
-  // Scroll focused item into view
   React.useEffect(() => {
     if (
       focusedIndex !== -1 &&
@@ -747,7 +738,6 @@ export function FileExplorer({
     const isMulti =
       entry && selectedPaths.size > 1 && selectedPaths.has(entry.path);
 
-    // Multi-select context menu: only Copy, Cut, Delete
     if (isMulti) {
       const selectedEntries = entries.filter((e) => selectedPaths.has(e.path));
       return (
@@ -789,11 +779,8 @@ export function FileExplorer({
       );
     }
 
-    // Groups are rendered only if they have content.
-    // Separators are rendered only if there's content before them.
     const items: React.ReactNode[] = [];
 
-    // Group 1: New File/Folder
     if (isFolder || isEmpty) {
       items.push(
         <ContextMenuGroup key="new">
@@ -809,7 +796,6 @@ export function FileExplorer({
       );
     }
 
-    // Group 1.5: Expand All
     if (isFolder || isEmpty) {
       if (items.length > 0) items.push(<ContextMenuSeparator key="sep0.5" />);
       items.push(
@@ -826,7 +812,6 @@ export function FileExplorer({
       );
     }
 
-    // Group 2: Rename/Duplicate
     if (entry) {
       if (items.length > 0) items.push(<ContextMenuSeparator key="sep1" />);
       items.push(
@@ -851,7 +836,6 @@ export function FileExplorer({
       );
     }
 
-    // Group 3: Paths/FileManager
     if (items.length > 0) items.push(<ContextMenuSeparator key="sep2" />);
     items.push(
       <ContextMenuGroup key="paths">
@@ -878,7 +862,6 @@ export function FileExplorer({
       </ContextMenuGroup>
     );
 
-    // Group 4: Cut/Copy/Paste
     if (entry || hasPaste) {
       if (items.length > 0) items.push(<ContextMenuSeparator key="sep3" />);
       items.push(
@@ -907,7 +890,6 @@ export function FileExplorer({
       );
     }
 
-    // Group 5: Delete
     if (entry) {
       if (items.length > 0) items.push(<ContextMenuSeparator key="sep4" />);
       items.push(
@@ -923,7 +905,6 @@ export function FileExplorer({
       );
     }
 
-    // Group 6: Close Folder
     if (isEmpty) {
       if (items.length > 0) items.push(<ContextMenuSeparator key="sep5" />);
       items.push(

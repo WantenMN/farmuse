@@ -84,7 +84,6 @@ export function PathPalette({
         const items = await invoke<FileEntry[]>("list_directory_contents", {
           path: dirToList,
         });
-        // If folder mode, only show directories
         const filteredItems =
           mode === "folder" ? items.filter((i) => i.is_dir) : items;
         setSuggestions(filteredItems);
@@ -144,10 +143,8 @@ export function PathPalette({
     return fuzzyFilter(suggestions, lastPart, (s) => s.name).slice(0, 20);
   }, [suggestions, lastPart]);
 
-  // Auto-scroll to selected item
   React.useEffect(() => {
     if (open && selectedValue) {
-      // Small delay to ensure cmdk has updated the DOM attributes
       const timer = setTimeout(() => {
         const selectedElement = document.querySelector(
           `[cmdk-item][data-value="${selectedValue}"]`

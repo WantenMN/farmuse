@@ -41,7 +41,6 @@ export function FileExplorerItem({
   React.useEffect(() => {
     if (isEditing && inputRef.current) {
       const input = inputRef.current;
-      // Focus after a short delay to ensure the context menu doesn't steal focus
       const timer = setTimeout(() => {
         input.focus();
         input.select();
@@ -67,7 +66,6 @@ export function FileExplorerItem({
       onMouseDown={onMouseDown}
       onContextMenu={onContextMenu}
     >
-      {/* Vertical line for expanded scope */}
       {entry.depth > 0 &&
         Array.from({ length: entry.depth }).map((_, i) => (
           <div

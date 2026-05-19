@@ -54,12 +54,10 @@ fn list_directory_contents(path: String) -> Result<Vec<FileEntry>, String> {
             let name = entry.file_name().to_string_lossy().to_string();
             let is_dir = path.is_dir();
 
-            // Filter out hidden entries (names starting with dot)
             if name.starts_with('.') {
                 continue;
             }
 
-            // If it's a file, only include if it's a markdown file
             if !is_dir && !name.to_lowercase().ends_with(".md") {
                 continue;
             }
@@ -71,7 +69,6 @@ fn list_directory_contents(path: String) -> Result<Vec<FileEntry>, String> {
             });
         }
     }
-    // Sort directories first, then by name
     result.sort_by(|a, b| {
         if a.is_dir != b.is_dir {
             b.is_dir.cmp(&a.is_dir)
@@ -86,7 +83,6 @@ fn list_directory_contents(path: String) -> Result<Vec<FileEntry>, String> {
 fn list_subdirs(path: String) -> Result<Vec<String>, String> {
     let resolved_path = resolve_path(&path)?;
 
-    // If the path is a file, get its parent
     let search_dir = if resolved_path.is_dir() {
         resolved_path.clone()
     } else {
@@ -127,7 +123,6 @@ fn watch_file(app: AppHandle, state: tauri::State<WatcherState>, path: String) -
     let resolved_path = resolve_path(&path)?;
     let mut watcher_opt = state.0.lock().unwrap();
 
-    // Stop previous watcher
     *watcher_opt = None;
 
     let app_clone = app.clone();
@@ -173,11 +168,9 @@ fn watch_explorer_directories(
         if let Ok(event) = res {
             let mut dirs_to_refresh = HashSet::new();
             for path in event.paths {
-                // If it's a directory that changed, or if a file inside a directory changed
                 if let Some(parent) = path.parent() {
                     dirs_to_refresh.insert(parent.to_string_lossy().to_string());
                 }
-                // Also add the path itself if it's one of the watched directories
                 dirs_to_refresh.insert(path.to_string_lossy().to_string());
             }
             for dir in dirs_to_refresh {
@@ -395,7 +388,6 @@ async fn list_all_subdirs(state: tauri::State<'_, IndexerState>, path: String) -
             }
         }
     }
-    // ... Fallback logic ...
     let mut result = Vec::new();
     let mut stack = vec![resolved_path];
 
@@ -420,7 +412,6 @@ async fn list_all_subdirs(state: tauri::State<'_, IndexerState>, path: String) -
 async fn initialize_indexer(app: AppHandle, state: tauri::State<'_, IndexerState>, root_path: String) -> Result<(), String> {
     let resolved_root = resolve_path(&root_path)?;
 
-    // 1. Initialize DB
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     fs::create_dir_all(&app_dir).map_err(|e| e.to_string())?;
     let db_path = app_dir.join("index.db");
@@ -433,11 +424,9 @@ async fn initialize_indexer(app: AppHandle, state: tauri::State<'_, IndexerState
 
     let root_str_for_indexing = root_str.clone();
 
-    // 2. Incremental Indexing in background
     tauri::async_runtime::spawn(async move {
         let _ = app_handle_progress.emit("index-status", "indexing");
 
-        // Get existing metadata to skip unchanged files
         let existing_meta = db_clone.get_metadata_for_root(&root_str_for_indexing).await.unwrap_or_default();
         let mut found_paths = std::collections::HashSet::new();
         let mut count = 0;
@@ -477,7 +466,6 @@ async fn initialize_indexer(app: AppHandle, state: tauri::State<'_, IndexerState
                 .map(|d| d.as_secs() as i64)
                 .unwrap_or(0);
 
-            // Only update if mtime changed or entry is new
             if existing_meta.get(&normalized_path) != Some(&mtime) {
                 let _ = DbManager::upsert_entry_tx(&mut tx, &normalized_path, &name, is_dir, mtime, &root_str_for_indexing).await;
                 updated_count += 1;
@@ -491,7 +479,6 @@ async fn initialize_indexer(app: AppHandle, state: tauri::State<'_, IndexerState
             }
         }
 
-        // Remove stale entries
         let _ = DbManager::cleanup_root_stale_tx(&mut tx, &root_str_for_indexing, &found_paths).await;
 
         let _ = tx.commit().await;
@@ -506,7 +493,6 @@ async fn initialize_indexer(app: AppHandle, state: tauri::State<'_, IndexerState
 
     *state.db.lock().unwrap() = Some(db);
 
-    // 3. Setup Watcher
     let app_handle = app.clone();
     let root_str_for_watcher = root_str.clone();
     let mut watcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
@@ -592,7 +578,7 @@ async fn search_markdown_files(state: tauri::State<'_, IndexerState>, query: Str
 
         let mut ranked: Vec<(i64, db::MarkdownFile)> = all_files
             .into_iter()
-            .filter(|f| !f.is_dir) // Only search files
+            .filter(|f| !f.is_dir)
             .filter_map(|file| {
                 matcher.fuzzy_match(&file.filename, &query)
                     .map(|score| (score, file))

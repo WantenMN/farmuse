@@ -45,7 +45,6 @@ export function CommandPalette() {
     return fuzzyFilter(allCommands, search, (cmd) => cmd.name);
   }, [allCommands, search]);
 
-  // Auto-select first item when search changes
   React.useEffect(() => {
     if (filteredCommands.length > 0) {
       if (!selectedId || !filteredCommands.find((c) => c.id === selectedId)) {
@@ -56,11 +55,9 @@ export function CommandPalette() {
     }
   }, [filteredCommands, selectedId]);
 
-  // Auto-scroll to selected item
   React.useEffect(() => {
     if (open && selectedId) {
       const timer = setTimeout(() => {
-        // cmdk lowercases the value attribute
         const selectedElement = document.querySelector(
           `[cmdk-item][data-value="${selectedId.toLowerCase()}"]`
         );

@@ -49,7 +49,6 @@ export function useWorkspace(savedState: WorkspaceState | null) {
 
         if (onAfterLoad) await onAfterLoad();
 
-        // Focus the explorer after a short delay
         setTimeout(() => {
           commandManager.execute("explorer.focus");
         }, 50);

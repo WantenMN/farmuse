@@ -24,7 +24,6 @@ class CommandManager {
     const command = this.commands.get(id);
     if (command) {
       command.handler(args);
-      // Update history: remove if exists, then push to front
       this.usageHistory = [id, ...this.usageHistory.filter((h) => h !== id)];
       return true;
     }
@@ -33,7 +32,6 @@ class CommandManager {
 
   getAllCommands(): Command[] {
     const all = Array.from(this.commands.values());
-    // Sort by history first, then by registration order (or name)
     return all.sort((a, b) => {
       const indexA = this.usageHistory.indexOf(a.id);
       const indexB = this.usageHistory.indexOf(b.id);

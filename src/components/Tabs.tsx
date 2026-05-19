@@ -33,7 +33,6 @@ export function Tabs({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const tabRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
 
-  // Auto-scroll active tab into view
   React.useEffect(() => {
     if (!activePath) return;
     const el = tabRefs.current.get(activePath);
@@ -132,7 +131,6 @@ function TabScrollbar({
   const [isHoverActive, setIsHoverActive] = React.useState(false);
   const [ratio, setRatio] = React.useState({ left: 0, thumbWidth: 0 });
 
-  // Track scroll & overflow
   React.useEffect(() => {
     if (!el) return;
     const update = () => {
@@ -159,7 +157,6 @@ function TabScrollbar({
     };
   }, [el]);
 
-  // Wheel → horizontal scroll
   React.useEffect(() => {
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
@@ -172,7 +169,6 @@ function TabScrollbar({
     return () => el.removeEventListener("wheel", onWheel);
   }, [el]);
 
-  // Tabs hover listeners (for thin indicator)
   React.useEffect(() => {
     if (!el) return;
     const enter = () => setIsTabsHover(true);
@@ -185,7 +181,6 @@ function TabScrollbar({
     };
   }, [el]);
 
-  // Drag — listeners always attached, ref-based gate
   const ratioRef = React.useRef(ratio);
   ratioRef.current = ratio;
   const elRef = React.useRef(el);
@@ -219,7 +214,6 @@ function TabScrollbar({
     };
   }, []);
 
-  // Proximity detection for thick scrollbar — global, no dependency on tabs hover
   React.useEffect(() => {
     const DELAY = 300;
 
@@ -271,7 +265,6 @@ function TabScrollbar({
     const tw = Math.max(20, (clientWidth / scrollWidth) * clientWidth);
     const maxSL = scrollWidth - clientWidth;
     const maxTL = clientWidth - tw;
-    // Use getBoundingClientRect so offset is relative to track, not any child
     const trackRect = e.currentTarget.getBoundingClientRect();
     const cx = e.clientX - trackRect.left;
     if (cx < r.left || cx > r.left + tw) {
@@ -291,7 +284,6 @@ function TabScrollbar({
 
   return (
     <>
-      {/* Thin indicator — only on tabs hover, non-interactive */}
       <div
         className="pointer-events-none absolute left-0 w-full"
         style={{
@@ -311,7 +303,6 @@ function TabScrollbar({
         />
       </div>
 
-      {/* Thick interactive scrollbar — proximity-based, draggable */}
       <div
         className="absolute left-0 w-full"
         style={{

@@ -64,7 +64,6 @@ function App() {
     [rawActiveFilePath]
   );
 
-  // MRU tab history for Ctrl+Tab switching
   const [tabHistory, setTabHistory] = React.useState<string[]>([]);
   React.useEffect(() => {
     if (!activeFilePath) return;
@@ -75,7 +74,6 @@ function App() {
     });
   }, [activeFilePath]);
 
-  // MRU-aware close wrappers
   const mruCloseFile = React.useCallback(
     (path: string) => {
       closeFile(path);
@@ -118,7 +116,6 @@ function App() {
         return;
       }
 
-      // Save current state before switching
       if (currentPath && currentPath !== normalizedPath) {
         localStorage.setItem(
           `tabs_state_${currentPath}`,
@@ -127,8 +124,6 @@ function App() {
       }
 
       await loadDirectory(normalizedPath, undefined, async () => {
-        // Handle tab switching and restoration
-        // Only restore if we are actually switching folders
         if (normalizedPath !== currentPath) {
           const saved = localStorage.getItem(`tabs_state_${normalizedPath}`);
           let restoredFiles: { path: string; name: string }[] = [];
@@ -167,14 +162,12 @@ function App() {
           });
         }
 
-        // Initialize indexer for the new folder
         try {
           await invoke("initialize_indexer", { rootPath: normalizedPath });
         } catch (e) {
           console.error("Failed to initialize indexer", e);
         }
 
-        // Add to recent folders
         const recent = JSON.parse(
           localStorage.getItem("farmuse_recent_folders") || "[]"
         );
@@ -196,7 +189,6 @@ function App() {
     ]
   );
 
-  // Restore directory entries on mount
   React.useEffect(() => {
     if (currentPath && !hasRestoredEntries.current) {
       hasRestoredEntries.current = true;
@@ -204,7 +196,6 @@ function App() {
     }
   }, [currentPath, handleLoadDirectory]);
 
-  // Save state on changes
   React.useEffect(() => {
     const state = {
       currentPath,
@@ -231,9 +222,6 @@ function App() {
     }
   }, [currentPath, openFiles, activeFilePath, showExplorer, explorerWidth]);
 
-  // Close tab when its backing file is deleted externally.
-  // Delay allows updatePaths (rename/move) to fire first —
-  // if the path is updated in time, closeFile(oldPath) is a no-op.
   const deleteTimersRef = React.useRef<
     Map<string, ReturnType<typeof setTimeout>>
   >(new Map());
@@ -241,7 +229,7 @@ function App() {
     const unlisten = listen<string>("file-deleted", (event) => {
       const path = event.payload;
       const timers = deleteTimersRef.current;
-      if (timers.has(path)) return; // already pending
+      if (timers.has(path)) return;
       const timer = setTimeout(() => {
         timers.delete(path);
         mruCloseFile(path);
@@ -254,7 +242,6 @@ function App() {
     };
   }, [mruCloseFile]);
 
-  // Track recently opened files
   React.useEffect(() => {
     if (!activeFilePath || activeFilePath.includes("://")) return;
     const saved = JSON.parse(
@@ -380,7 +367,6 @@ function App() {
                   file.path !== activeFilePath && "hidden"
                 )}
                 onMouseDownCapture={() => {
-                  // Only reveal, don't necessarily focus editor
                   commandManager.execute("explorer.revealActiveFile", {
                     path: file.path,
                   });

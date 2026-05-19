@@ -95,7 +95,6 @@ function DropIndicator({
     return container.getBoundingClientRect();
   }, [container]);
 
-  // Use state + effect for DOM measurement so it recalculates after Virtuoso renders new items
   const [rect, setRect] = React.useState<{
     top: number;
     bottom: number;
@@ -107,7 +106,6 @@ function DropIndicator({
       return;
     }
 
-    // Use rAF to wait for Virtuoso to render new items
     const rafId = requestAnimationFrame(() => {
       const allItems = Array.from(
         container.querySelectorAll("[data-entry-path]")

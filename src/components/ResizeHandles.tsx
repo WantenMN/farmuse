@@ -41,7 +41,6 @@ export function ResizeHandles() {
 
   return (
     <>
-      {/* Edges - 4px hit area */}
       <div
         className="fixed top-0 right-0 left-0 z-[9999] h-1 cursor-n-resize"
         onMouseDown={(e) => {
@@ -67,7 +66,6 @@ export function ResizeHandles() {
         }}
       />
 
-      {/* Corners - 8px hit area */}
       <div
         className="fixed top-0 left-0 z-[10000] h-2 w-2 cursor-nw-resize"
         onMouseDown={(e) => {

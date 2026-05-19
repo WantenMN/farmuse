@@ -31,11 +31,6 @@ const hrDecoration = Decoration.replace({
   widget: new HRWidget(),
 });
 
-/**
- * State and Effect to track active pointer (mouse) interaction.
- * This is used to suppress source-mode rendering during selection dragging,
- * providing a stable preview and avoiding layout shifts.
- */
 const setPointerActive = StateEffect.define<{
   active: boolean;
   selection: SelectionRange | null;
@@ -131,9 +126,6 @@ const compositionPlugin = ViewPlugin.fromClass(
   }
 );
 
-/**
- * Robustly tracks pointer down/up states across the entire window.
- */
 const pointerInteractionPlugin = ViewPlugin.fromClass(
   class {
     constructor(public view: EditorView) {}
@@ -154,8 +146,6 @@ const pointerInteractionPlugin = ViewPlugin.fromClass(
           const sel = view.state.selection.main;
           let newSel = sel;
 
-          // Handle clicks on empty space around rendered content
-          // We allow a tiny tolerance (2 chars) for accidental micro-drags during click
           const isCheckableAsClick =
             sel.empty || Math.abs(sel.to - sel.from) <= 2;
 
@@ -185,16 +175,11 @@ const pointerInteractionPlugin = ViewPlugin.fromClass(
                   }
                 }
               }
-            } catch {
-              // Ignore errors during potential rapid re-renders
-            }
+            } catch {}
           }
 
-          // If we didn't jump to end/start, and we have a real selection, do snapping
           if (newSel.empty && !sel.empty && !isCheckableAsClick) {
-            // Skip snap if we already decided to cursor-jump
           } else if (!newSel.empty) {
-            // Snap selection to hidden markers for links, images, and formatting
             syntaxTree(view.state).iterate({
               from: newSel.from,
               to: newSel.to,
@@ -239,15 +224,11 @@ const pointerInteractionPlugin = ViewPlugin.fromClass(
                     let { from, to } = newSel;
                     let changed = false;
 
-                    // If selection starts within the leading markers, snap to node start
                     if (from >= node.from && from <= firstMark.to) {
                       from = node.from;
                       changed = true;
                     }
-                    // If selection ends within or after the trailing hidden markers, snap to node end
                     if (to >= snapEndMark.from && to <= node.to) {
-                      // Only snap if we've actually selected some content or it's a deliberate wide selection
-                      // This prevents accidental 1px drags from highlighting the trailing stars
                       if (from < snapEndMark.from || Math.abs(to - from) > 2) {
                         to = node.to;
                         changed = true;
@@ -279,9 +260,6 @@ const pointerInteractionPlugin = ViewPlugin.fromClass(
   }
 );
 
-/**
- * Handle Table rendering
- */
 function handleTable(
   node: SyntaxNodeRef,
   state: EditorState,
@@ -302,9 +280,6 @@ function handleTable(
   return node.to;
 }
 
-/**
- * Handle Image rendering and source mode toggle
- */
 function handleImage(
   node: SyntaxNodeRef,
   state: EditorState,
@@ -396,9 +371,6 @@ function handleImage(
   return node.to;
 }
 
-/**
- * Handle Horizontal Rule rendering
- */
 function handleHorizontalRule(
   node: SyntaxNodeRef,
   selection: SelectionRange | null,
@@ -415,9 +387,6 @@ function handleHorizontalRule(
   return null;
 }
 
-/**
- * Handle Link and URL decorations (mark as clickable)
- */
 function handleLinkAndURL(
   node: SyntaxNodeRef,
   state: EditorState,
@@ -460,9 +429,6 @@ function handleLinkAndURL(
   }
 }
 
-/**
- * Common marks handling (Header, Emphasis, List, etc.)
- */
 function handleMarks(
   node: SyntaxNodeRef,
   state: EditorState,
@@ -519,12 +485,10 @@ function handleMarks(
           node.name === "ListMark" ||
           node.name === "QuoteMark")));
 
-  // 1. Handle Headings
   if (node.name === "HeaderMark") {
     return handleHeader(node, state, isSelected ?? false, builder);
   }
 
-  // 2. Handle Lists and Tasks
   if (node.name === "ListMark" || node.name === "TaskMarker") {
     const listResult = handleListAndTask(node, state, selection, builder);
     if (listResult !== null) return listResult;
@@ -534,12 +498,10 @@ function handleMarks(
     }
   }
 
-  // 3. Handle Code marks
   if (node.name === "CodeMark" || node.name === "CodeInfo") {
     return handleCodeMark(node, isSelected ?? false, builder);
   }
 
-  // 4. Handle Emphasis marks
   if (
     node.name === "EmphasisMark" ||
     node.name === "StrongEmphasisMark" ||
@@ -548,7 +510,6 @@ function handleMarks(
     return handleEmphasisMark(node, isSelected ?? false, builder);
   }
 
-  // 5. Handle Other marks (Quote, Link, etc.)
   if (!isSelected) {
     const markTo = node.to;
     if (node.name === "URL") {
@@ -565,9 +526,6 @@ function handleMarks(
   return null;
 }
 
-/**
- * Handle Header markers
- */
 function handleHeader(
   node: SyntaxNodeRef,
   state: EditorState,
@@ -586,9 +544,6 @@ function handleHeader(
   return null;
 }
 
-/**
- * Fallback for ListMark if not a task list or task not handled
- */
 function handleListFallback(
   node: SyntaxNodeRef,
   state: EditorState,
@@ -629,9 +584,6 @@ function handleListFallback(
   return null;
 }
 
-/**
- * Handle Code marks
- */
 function handleCodeMark(
   node: SyntaxNodeRef,
   isSelected: boolean,
@@ -644,9 +596,6 @@ function handleCodeMark(
   return null;
 }
 
-/**
- * Handle Emphasis marks
- */
 function handleEmphasisMark(
   node: SyntaxNodeRef,
   isSelected: boolean,
@@ -659,9 +608,6 @@ function handleEmphasisMark(
   return null;
 }
 
-/**
- * Handle List markers and Task checkboxes
- */
 function handleListAndTask(
   node: SyntaxNodeRef,
   state: EditorState,
@@ -716,11 +662,12 @@ function computeDecorations(state: EditorState) {
   const focused = state.field(focusedField);
   const builder = new RangeSetBuilder<Decoration>();
   const linkBuilder = new RangeSetBuilder<Decoration>();
-  const selection = interaction.active && focused
-    ? interaction.selection
-    : focused
-      ? state.selection.main
-      : null;
+  const selection =
+    interaction.active && focused
+      ? interaction.selection
+      : focused
+        ? state.selection.main
+        : null;
   let lastPos = -1;
 
   syntaxTree(state).iterate({
@@ -729,31 +676,26 @@ function computeDecorations(state: EditorState) {
     enter: (node) => {
       if (node.from < lastPos) return;
 
-      // Try Table
       const tablePos = handleTable(node, state, builder);
       if (tablePos !== null) {
         lastPos = tablePos;
         return;
       }
 
-      // Try Image
       const imagePos = handleImage(node, state, selection, builder);
       if (imagePos !== null) {
         lastPos = imagePos;
         return;
       }
 
-      // Try Horizontal Rule
       const hrPos = handleHorizontalRule(node, selection, builder);
       if (hrPos !== null) {
         lastPos = hrPos;
         return;
       }
 
-      // Handle Link/URL marks
       handleLinkAndURL(node, state, selection, linkBuilder);
 
-      // Handle common marks (Header, List, etc.)
       const markPos = handleMarks(node, state, selection, builder);
       if (markPos !== null) {
         lastPos = markPos;
@@ -764,10 +706,6 @@ function computeDecorations(state: EditorState) {
   return RangeSet.join([builder.finish(), linkBuilder.finish()]);
 }
 
-/**
- * The main Live Preview plugin extension.
- * Consists of the interaction tracker, state field, and the decoration logic.
- */
 const livePreviewStateField = StateField.define<DecorationSet>({
   create(state) {
     return computeDecorations(state);

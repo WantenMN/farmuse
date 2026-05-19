@@ -12,3 +12,6 @@ After every code modification:
 1. Run `npx tsc --noEmit` to type-check.
 2. Run `deno task lint` — fix any errors or warnings until linting passes completely.
 3. Run `deno task format` for consistent styling.
+
+## No Comments
+Do not add any comments to the code. This includes single-line (`//`), multi-line (`/* */`), JSDoc (`/** */`), and JSX (`{/* */}) comments. Tooling directives (`// eslint-disable-next-line`, `// @ts-expect-error`) are the only exception.
