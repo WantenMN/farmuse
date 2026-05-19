@@ -66,6 +66,55 @@ const composingField = StateField.define<boolean>({
   },
 });
 
+const setFocused = StateEffect.define<boolean>();
+
+const focusedField = StateField.define<boolean>({
+  create: () => false,
+  update: (value, tr) => {
+    for (const effect of tr.effects) {
+      if (effect.is(setFocused)) return effect.value;
+    }
+    return value;
+  },
+});
+
+const focusPlugin = ViewPlugin.fromClass(
+  class {
+    mouseDown = false;
+
+    constructor(public view: EditorView) {
+      if (view.hasFocus) {
+        view.dispatch({ effects: setFocused.of(true) });
+      }
+    }
+  },
+  {
+    eventHandlers: {
+      mousedown(_event, view) {
+        const plugin = view.plugin(focusPlugin);
+        if (plugin) plugin.mouseDown = true;
+      },
+      mouseup(_event, view) {
+        const plugin = view.plugin(focusPlugin);
+        if (plugin) {
+          plugin.mouseDown = false;
+          if (view.hasFocus) {
+            view.dispatch({ effects: setFocused.of(true) });
+          }
+        }
+      },
+      focus(_event, view) {
+        const plugin = view.plugin(focusPlugin);
+        if (plugin?.mouseDown) return;
+        view.dispatch({ effects: setFocused.of(true) });
+      },
+      blur(_event, view) {
+        view.dispatch({ effects: setFocused.of(false) });
+      },
+    },
+  }
+);
+
 const compositionPlugin = ViewPlugin.fromClass(
   class {
     constructor(public view: EditorView) {}
@@ -664,11 +713,14 @@ function handleListAndTask(
 
 function computeDecorations(state: EditorState) {
   const interaction = state.field(pointerActiveField);
+  const focused = state.field(focusedField);
   const builder = new RangeSetBuilder<Decoration>();
   const linkBuilder = new RangeSetBuilder<Decoration>();
-  const selection = interaction.active
+  const selection = interaction.active && focused
     ? interaction.selection
-    : state.selection.main;
+    : focused
+      ? state.selection.main
+      : null;
   let lastPos = -1;
 
   syntaxTree(state).iterate({
@@ -752,7 +804,9 @@ const livePreviewStateField = StateField.define<DecorationSet>({
 export const livePreviewPlugin = [
   pointerActiveField,
   composingField,
+  focusedField,
   pointerInteractionPlugin,
   compositionPlugin,
+  focusPlugin,
   livePreviewStateField,
 ];
