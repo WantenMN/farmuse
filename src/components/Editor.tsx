@@ -23,8 +23,7 @@ export function Editor({
   isActive: _isActive = false,
   focusNewFilePath,
 }: EditorProps) {
-  const { content, setContent, error, loading, isSaving, lastSavedContent } =
-    useEditor({ path, name });
+  const { content, setContent, error, loading } = useEditor({ path, name });
   const fontSize = useSettingsStore((state) => state.fontSize);
   const showLineNumbers = useSettingsStore((state) => state.showLineNumbers);
 
@@ -100,12 +99,7 @@ export function Editor({
         {error && <EditorErrorState error={error} />}
         <CustomScrollbar containerRef={scrollDomRef} />
       </div>
-      <EditorStatusBar
-        isSaving={isSaving}
-        isModified={content !== lastSavedContent}
-        mode={mode}
-        onModeChange={setMode}
-      />
+      <EditorStatusBar mode={mode} onModeChange={setMode} />
     </div>
   );
 }
