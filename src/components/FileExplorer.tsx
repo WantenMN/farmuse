@@ -62,6 +62,7 @@ interface FileExplorerProps {
   onFileMoved?: (oldPath: string, newPath: string) => void;
   activeFilePath?: string | null;
   onCloseFolder?: () => void;
+  focusNewFilePath?: React.MutableRefObject<string | null>;
 }
 
 export function NewItemInput({
@@ -121,6 +122,7 @@ export function FileExplorer({
   onFileMoved,
   activeFilePath,
   onCloseFolder,
+  focusNewFilePath,
 }: FileExplorerProps) {
   const {
     entries,
@@ -410,6 +412,7 @@ export function FileExplorer({
       if (isFile) {
         onOpenFile(path, fullName);
         setFocusedPath(path);
+        if (focusNewFilePath) focusNewFilePath.current = path;
       } else {
         setFocusedPath(path);
       }

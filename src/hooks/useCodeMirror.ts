@@ -53,9 +53,12 @@ export function useCodeMirror({
     if (view && value !== null) {
       const currentDoc = view.state.doc.toString();
       if (value !== currentDoc) {
+        const head = view.state.selection.main.head;
         view.dispatch({
           changes: { from: 0, to: currentDoc.length, insert: value },
         });
+        const newHead = Math.min(head, value.length);
+        view.dispatch({ selection: { anchor: newHead } });
       }
     }
   }, [value, view]);

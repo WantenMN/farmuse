@@ -106,6 +106,8 @@ function App() {
     [baseOpenFile]
   );
 
+  const focusNewFilePath = React.useRef<string | null>(null);
+
   const hasRestoredEntries = React.useRef(false);
 
   const handleLoadDirectory = React.useCallback(
@@ -338,6 +340,7 @@ function App() {
           onFileMoved={updatePaths}
           activeFilePath={activeFilePath}
           onCloseFolder={closeFolder}
+          focusNewFilePath={focusNewFilePath}
         />
 
         <main className="flex min-w-0 flex-1 flex-col">
@@ -398,6 +401,7 @@ function App() {
                     path={file.path}
                     name={file.name}
                     isActive={file.path === activeFilePath}
+                    focusNewFilePath={focusNewFilePath}
                   />
                 )}
               </div>
