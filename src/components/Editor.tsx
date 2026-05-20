@@ -49,13 +49,7 @@ export function Editor({
     autoFocus: false,
   });
 
-  React.useEffect(() => {
-    if (view) {
-      scrollDomRef.current = view.scrollDOM;
-    } else {
-      scrollDomRef.current = null;
-    }
-  }, [view]);
+  scrollDomRef.current = view?.scrollDOM ?? null;
 
   const wasActive = React.useRef(false);
   const wasLoading = React.useRef(loading);

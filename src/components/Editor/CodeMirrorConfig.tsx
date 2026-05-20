@@ -66,6 +66,13 @@ export const getDefaultExtensions = (
     EditorView.editorAttributes.of({
       class: mode === "live" ? "cm-mode-live" : "cm-mode-source",
     }),
+    EditorView.theme({
+      ".cm-scroller": {
+        scrollbarWidth: "none",
+        msOverflowStyle: "none",
+        "&::-webkit-scrollbar": { display: "none" },
+      },
+    }),
     blockDecorationsPlugin,
     hoveredLineField,
     sourceModeImageField,
