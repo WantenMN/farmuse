@@ -10,6 +10,11 @@ interface UseEditorProps {
 const contentCache = new Map<string, string>();
 const lastSavedContentCache = new Map<string, string>();
 
+export function clearEditorCache(path: string) {
+  contentCache.delete(path);
+  lastSavedContentCache.delete(path);
+}
+
 export function useEditor({ path, name }: UseEditorProps) {
   const [content, setContent] = React.useState<string | null>(() =>
     path ? contentCache.get(path) || null : null

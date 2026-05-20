@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "./lib/utils";
+import { clearEditorCache } from "./hooks/useEditor";
 import { TitleBar } from "./components/TitleBar";
 import { ResizeHandles } from "./components/ResizeHandles";
 import { CommandPalette } from "./components/CommandPalette";
@@ -76,6 +77,7 @@ function App() {
 
   const mruCloseFile = React.useCallback(
     (path: string) => {
+      clearEditorCache(path);
       closeFile(path);
       setTabHistory((prev) => prev.filter((p) => p !== path));
     },
